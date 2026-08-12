@@ -124,11 +124,10 @@ export function isWall(map: CompiledMap, cell: number): boolean {
  * ソルバーは「領域内の祭壇で交換する」をマクロ行動として扱える（§7.2）。
  */
 export function isPassable(map: CompiledMap, state: GameState, cell: number): boolean {
-  if (isWall(map, cell)) return false;
-  const object = map.objectAt[cell] ?? null;
-  if (object === null) return true;
-  if (object.type === 'altar') return true;
-  return isConsumed(state, cell);
+  const block = map.blockKind[cell]!;
+  if (block === 0) return true; // 何もない床、または祭壇
+  if (block === 2) return false; // 壁
+  return isConsumed(state, cell); // オブジェクト。解決済みなら通れる
 }
 
 export function isGoal(map: CompiledMap, state: GameState): boolean {

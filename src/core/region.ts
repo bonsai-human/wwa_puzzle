@@ -38,8 +38,8 @@ export function forEachNeighbor(
 export interface Region {
   /** 1 = 到達可能。 */
   readonly flags: Uint8Array;
-  /** 到達可能なセルの一覧。昇順。 */
-  readonly cells: Int32Array;
+  /** 到達可能なセルの数。 */
+  readonly size: number;
 }
 
 /**
@@ -47,6 +47,9 @@ export interface Region {
  *
  * 起点は通行可能でなくても含める。オブジェクトを解決した直後は
  * そのセルに立っているが、消費済みなので通行可能でもある。
+ *
+ * 探索の最内側で呼ばれるため、必要最小限しか作らない。
+ * セルの一覧が要る場合は {@link regionCells} を使う。
  */
 export function reachable(map: CompiledMap, state: GameState): Region {
   const flags = new Uint8Array(map.cellCount);
@@ -54,26 +57,94 @@ export function reachable(map: CompiledMap, state: GameState): Region {
   let head = 0;
   let tail = 0;
 
+  // 最内側のループなので、近傍表と障害テーブルを直接引く。
+  const neighbors = map.neighbors;
+  const blockKind = map.blockKind;
+  const consumed = state.consumed;
+
   flags[state.pos] = 1;
   queue[tail++] = state.pos;
 
   while (head < tail) {
-    const cell = queue[head++]!;
-    forEachNeighbor(map, cell, (neighbor) => {
-      if (flags[neighbor] === 1) return;
-      if (!isPassable(map, state, neighbor)) return;
+    const base = queue[head++]! * 4;
+    for (let k = 0; k < 4; k++) {
+      const neighbor = neighbors[base + k]!;
+      if (neighbor < 0 || flags[neighbor] === 1) continue;
+
+      const block = blockKind[neighbor]!;
+      if (block === 2) continue;
+      if (block === 1 && (consumed[neighbor >>> 5]! & (1 << (neighbor & 31))) === 0) continue;
+
       flags[neighbor] = 1;
       queue[tail++] = neighbor;
-    });
+    }
   }
 
-  const cells = new Int32Array(tail);
+  return { flags, size: tail };
+}
+
+/**
+ * 1マスを解決した直後の自由領域を、直前の領域から差分で求める。
+ *
+ * オブジェクトの解決は通行可能性を増やすだけで、決して減らさない。
+ * よって直前に到達できたセルは今も到達できる。新しく調べる必要があるのは、
+ * 解決したセルから先に広がった範囲だけである。
+ *
+ * 探索は生成した状態ごとにこれを呼ぶ。全面の再探索と比べて、
+ * 実マップでは一桁以上安い。
+ *
+ * `base` は `openedCell` に隣接していた領域でなければならない。
+ * 離れたセルを渡すと領域が繋がっていないまま返る。
+ */
+export function growRegion(
+  map: CompiledMap,
+  state: GameState,
+  base: Region,
+  openedCell: number,
+): Region {
+  const flags = Uint8Array.from(base.flags);
+  if (flags[openedCell] === 1) return { flags, size: base.size };
+
+  const neighbors = map.neighbors;
+  const blockKind = map.blockKind;
+  const consumed = state.consumed;
+
+  const queue = new Int32Array(map.cellCount);
+  let head = 0;
+  let tail = 0;
+  let size = base.size;
+
+  flags[openedCell] = 1;
+  size += 1;
+  queue[tail++] = openedCell;
+
+  while (head < tail) {
+    const cellBase = queue[head++]! * 4;
+    for (let k = 0; k < 4; k++) {
+      const neighbor = neighbors[cellBase + k]!;
+      if (neighbor < 0 || flags[neighbor] === 1) continue;
+
+      const block = blockKind[neighbor]!;
+      if (block === 2) continue;
+      if (block === 1 && (consumed[neighbor >>> 5]! & (1 << (neighbor & 31))) === 0) continue;
+
+      flags[neighbor] = 1;
+      size += 1;
+      queue[tail++] = neighbor;
+    }
+  }
+
+  return { flags, size };
+}
+
+/** 到達可能なセルの一覧。昇順。 */
+export function regionCells(map: CompiledMap, region: Region): Int32Array {
+  const cells = new Int32Array(region.size);
   let index = 0;
   for (let cell = 0; cell < map.cellCount; cell++) {
-    if (flags[cell] === 1) cells[index++] = cell;
+    if (region.flags[cell] === 1) cells[index++] = cell;
   }
-
-  return { flags, cells };
+  return cells;
 }
 
 /**
@@ -92,11 +163,14 @@ export function frontierObjects(map: CompiledMap, state: GameState, region?: Reg
     if (object === null || object.type === 'altar') continue;
     if (flags[cell] === 1) continue; // 消費済みで領域に入っている
 
-    let adjacent = false;
-    forEachNeighbor(map, cell, (neighbor) => {
-      if (flags[neighbor] === 1) adjacent = true;
-    });
-    if (adjacent) found.push(cell);
+    const base = cell * 4;
+    for (let k = 0; k < 4; k++) {
+      const neighbor = map.neighbors[base + k]!;
+      if (neighbor >= 0 && flags[neighbor] === 1) {
+        found.push(cell);
+        break;
+      }
+    }
   }
 
   return Int32Array.from(found);

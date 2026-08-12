@@ -84,6 +84,19 @@ export interface CompiledMap {
 
   /** 1 = 壁。永久に不変。 */
   readonly walls: Uint8Array;
+  /**
+   * セルごとの通行の障害。0 = 何もない、1 = オブジェクト（解決すれば通れる）、2 = 壁。
+   *
+   * 探索は1状態あたり数百回このテーブルを引く。壁の判定とオブジェクトの
+   * 有無・種別の判定を1回の配列参照に畳んでおく。
+   */
+  readonly blockKind: Uint8Array;
+  /**
+   * 4近傍の索引表。`neighbors[cell * 4 + k]` が隣接セル、マップ外は -1。
+   *
+   * 最内側のループから座標計算と境界判定を追い出すためのもの。
+   */
+  readonly neighbors: Int32Array;
   /** セル → オブジェクト。無ければ `null`。 */
   readonly objectAt: readonly (CompiledObject | null)[];
   /** オブジェクトが存在するセルの一覧。 */
@@ -227,6 +240,30 @@ export function compileMap(def: MapDef): CompiledMap {
 
   objectCells.sort((a, b) => a - b);
 
+  // 通行の障害を1枚のテーブルに畳む。祭壇は消費されないが常に通れる。
+  const blockKind = new Uint8Array(cellCount);
+  for (let cell = 0; cell < cellCount; cell++) {
+    if (walls[cell] === 1) {
+      blockKind[cell] = 2;
+      continue;
+    }
+    const object = objectAt[cell] ?? null;
+    blockKind[cell] = object !== null && object.type !== 'altar' ? 1 : 0;
+  }
+
+  // 4近傍の索引表。走査順は決定性のため上・右・下・左で固定する。
+  const neighbors = new Int32Array(cellCount * 4).fill(-1);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const cell = y * width + x;
+      const base = cell * 4;
+      if (y > 0) neighbors[base] = cell - width;
+      if (x < width - 1) neighbors[base + 1] = cell + 1;
+      if (y < height - 1) neighbors[base + 2] = cell + width;
+      if (x > 0) neighbors[base + 3] = cell - 1;
+    }
+  }
+
   const keys = new Int32Array(keyColors.length);
   for (const [color, count] of Object.entries(def.player.keys ?? {})) {
     const id = keyIdByColor.get(color);
@@ -262,6 +299,8 @@ export function compileMap(def: MapDef): CompiledMap {
     startCell: initial.pos,
     goalCell: def.goal.y * width + def.goal.x,
     walls,
+    blockKind,
+    neighbors,
     objectAt,
     objectCells: Int32Array.from(objectCells),
     keyColors,

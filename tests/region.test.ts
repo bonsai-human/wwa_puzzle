@@ -42,7 +42,7 @@ describe('reachable', () => {
 
     expect(region.flags[cellOf(map, 2, 0)]).toBe(0);
     // 壁3枚と敵1体を除いた11マス。
-    expect(region.cells.length).toBe(11);
+    expect(region.size).toBe(11);
   });
 
   it('壁の向こうへは回り込める', () => {

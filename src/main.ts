@@ -15,7 +15,7 @@ interface Phase {
 const PHASES: readonly Phase[] = [
   { no: 0, name: '土台（Vite + TS + Vitest + CI + Pages）', done: true },
   { no: 1, name: 'core ルールエンジン', done: true },
-  { no: 2, name: 'solver 探索器', done: false },
+  { no: 2, name: 'solver 探索器', done: true },
   { no: 3, name: 'game 描画・入力・情報パネル', done: false },
   { no: 4, name: 'editor マップエディタ', done: false },
   { no: 5, name: 'gen 自動生成と難易度評価', done: false },

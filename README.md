@@ -13,7 +13,7 @@ GitHub Pages 上で動作する静的Webアプリ。
 |---|---|---|
 | 0 | 土台（Vite + TS + Vitest + CI + Pages） | 完了 |
 | 1 | `core/` ルールエンジン | 完了 |
-| 2 | `solver/` 探索器 | — |
+| 2 | `solver/` 探索器 | 完了 |
 | 3 | `game/` 描画・入力・情報パネル | — |
 | 4 | `editor/` マップエディタ | — |
 | 5 | `gen/` 自動生成と難易度評価 | — |
@@ -31,6 +31,7 @@ npm run typecheck   # 型チェック
 npm test            # テスト
 npm run build       # 本番ビルド（型チェック込み）
 npm run preview     # ビルド結果を配信して確認
+npm run bench       # 探索器の性能計測
 ```
 
 ### レスポンシブ確認
