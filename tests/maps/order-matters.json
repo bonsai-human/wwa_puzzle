@@ -1,0 +1,54 @@
+{
+  "formatVersion": 1,
+  "id": "order-matters",
+  "name": "順序が全て",
+  "width": 8,
+  "height": 5,
+  "screen": { "width": 8, "height": 5 },
+
+  "start": { "x": 1, "y": 1 },
+  "goal": { "x": 6, "y": 1 },
+  "player": { "hp": 20, "atk": 12, "def": 2 },
+
+  "terrain": ["########", "#......#", "#.######", "#.######", "#...####"],
+
+  "objects": [
+    {
+      "type": "item",
+      "x": 1,
+      "y": 4,
+      "effect": { "kind": "atk", "amount": 4 }
+    },
+    {
+      "type": "altar",
+      "x": 3,
+      "y": 4,
+      "id": "shrine",
+      "options": [
+        {
+          "id": "red-key",
+          "label": "赤い鍵",
+          "cost": 1,
+          "effect": { "kind": "key", "key": "red", "amount": 1 },
+          "stock": 1
+        }
+      ]
+    },
+    {
+      "type": "enemy",
+      "x": 4,
+      "y": 1,
+      "name": "門番",
+      "hp": 30,
+      "atk": 10,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "door",
+      "x": 5,
+      "y": 1,
+      "key": "red"
+    }
+  ]
+}
