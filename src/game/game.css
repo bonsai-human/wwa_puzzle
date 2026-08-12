@@ -1,0 +1,357 @@
+/*
+ * 盤面と情報パネル。設計 §11.2 / §11.3。
+ *
+ * 縦横で2領域を並べ替える。数値の可読性を最優先にし、
+ * 小画面でも数字だけは縮めない。
+ */
+
+.game {
+  display: grid;
+  gap: 0.75rem;
+  height: 100%;
+  min-height: 0;
+}
+
+.board-area {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board {
+  border-radius: 0.4rem;
+  /* 盤面のタップ操作とブラウザのジェスチャを競合させない。 */
+  touch-action: none;
+  cursor: pointer;
+}
+
+.panel-area {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 横長：盤面を左、情報パネルを右のサイドバーに。 */
+@media (min-aspect-ratio: 1 / 1) {
+  .game {
+    grid-template-columns: minmax(0, 1fr) clamp(15rem, 26vw, 21rem);
+  }
+}
+
+/* 縦長：盤面を上、情報パネルを下に。 */
+@media (max-aspect-ratio: 1 / 1) {
+  .game {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .panel-area {
+    max-height: 46vh;
+  }
+}
+
+/* --- 情報パネル ------------------------------------------------------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.35rem;
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.35rem;
+  background: var(--panel);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+}
+
+/* 判断材料はすべて数字なので、小画面でも数値だけは縮めない。 */
+.stat-value {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* タップ対象は実寸 44px 以上を確保する。 */
+.control {
+  min-height: 2.75rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.control:hover:not(:disabled) {
+  background: var(--panel-soft);
+}
+
+.control:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.control.primary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+
+.segment {
+  min-height: 2.25rem;
+  padding: 0 0.7rem;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.segment.is-active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.section {
+  border-top: 1px solid var(--line);
+  padding-top: 0.6rem;
+}
+
+.section h2 {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--fg-dim);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+.message {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 0.3rem 0.3rem 0;
+  background: var(--panel);
+  font-size: 0.9rem;
+}
+
+.empty {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+}
+
+.detail-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.detail-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.detail-rows dt {
+  color: var(--fg-dim);
+}
+
+.detail-rows dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.warning {
+  margin: 0 0 0.5rem;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.enemies {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.enemy {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.3rem;
+  background: var(--panel);
+  font-size: 0.9rem;
+}
+
+.enemy-mark {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: none;
+  border-radius: 0.15rem;
+}
+
+.enemy-mark[data-tier='0'] { background: #79c47f; }
+.enemy-mark[data-tier='1'] { background: #c9c46a; }
+.enemy-mark[data-tier='2'] { background: #dda05c; }
+.enemy-mark[data-tier='3'] { background: #dd6f5c; }
+.enemy-mark[data-tier='4'] { background: #c163c9; }
+
+.enemy-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enemy-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.enemy-value.is-unaffordable {
+  color: var(--danger);
+}
+
+.enemy-value.is-impossible {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* --- シート ----------------------------------------------------------- */
+
+.sheet {
+  width: min(26rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--panel);
+  color: var(--fg);
+}
+
+.sheet::backdrop {
+  background: rgba(10, 8, 14, 0.7);
+}
+
+.sheet h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.sheet-lead {
+  margin: 0 0 0.75rem;
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+}
+
+.sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.option {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.6rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+}
+
+.option-label {
+  font-weight: 600;
+}
+
+.option-cost,
+.option-stock {
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+/* 交換後の値。排他選択なので、比較できないと判断ができない。 */
+.option-preview {
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.option-reason {
+  grid-column: 1 / -1;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+.option .control {
+  grid-column: 1 / -1;
+  margin-top: 0.4rem;
+}
+
+.overview canvas {
+  display: block;
+  margin: 0 auto;
+  image-rendering: pixelated;
+  border-radius: 0.3rem;
+}
+
+/* --- クリア表示 ------------------------------------------------------- */
+
+.banner {
+  margin-bottom: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.4rem;
+  background: var(--ok);
+  color: var(--bg);
+  font-weight: 700;
+  text-align: center;
+}

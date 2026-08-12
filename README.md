@@ -14,7 +14,7 @@ GitHub Pages 上で動作する静的Webアプリ。
 | 0 | 土台（Vite + TS + Vitest + CI + Pages） | 完了 |
 | 1 | `core/` ルールエンジン | 完了 |
 | 2 | `solver/` 探索器 | 完了 |
-| 3 | `game/` 描画・入力・情報パネル | — |
+| 3 | `game/` 描画・入力・情報パネル | 完了 |
 | 4 | `editor/` マップエディタ | — |
 | 5 | `gen/` 自動生成と難易度評価 | — |
 | 6 | ヒント・詰み検出・共有URL・保存 | — |
@@ -57,6 +57,7 @@ npm run shot        # screenshots/ にビューポート別のスクリーンシ
 | `src/gen/` | マップの自動生成と難易度評価 |
 | `src/editor/` | マップエディタ |
 | `src/game/` | Canvas 描画・入力・UI |
+| `src/maps/` | 同梱マップ（すべてソルバーで検品済み） |
 
 `src/core/` が他モジュール・実行環境・乱数に依存しないことは
 `tests/boundaries.test.ts` が機械的に検査する。

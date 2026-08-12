@@ -1,59 +1,40 @@
 import './style.css';
+import './game/game.css';
+import { mountGame } from './game/app.ts';
+import { loadBuiltinMaps } from './maps/index.ts';
 
-/**
- * Phase 0 の暫定エントリポイント。
- * ビルドと GitHub Pages への配信が通っていることを確認するためだけのもので、
- * Phase 3 で盤面の描画と情報パネルに置き換える。
- */
+const root = document.querySelector<HTMLElement>('#app');
+if (root !== null) {
+  const maps = loadBuiltinMaps();
 
-interface Phase {
-  readonly no: number;
-  readonly name: string;
-  readonly done: boolean;
-}
-
-const PHASES: readonly Phase[] = [
-  { no: 0, name: '土台（Vite + TS + Vitest + CI + Pages）', done: true },
-  { no: 1, name: 'core ルールエンジン', done: true },
-  { no: 2, name: 'solver 探索器', done: true },
-  { no: 3, name: 'game 描画・入力・情報パネル', done: false },
-  { no: 4, name: 'editor マップエディタ', done: false },
-  { no: 5, name: 'gen 自動生成と難易度評価', done: false },
-  { no: 6, name: 'ヒント・詰み検出・共有URL・保存', done: false },
-];
-
-function render(root: HTMLElement): void {
-  const section = document.createElement('section');
-  section.className = 'placeholder';
+  const header = document.createElement('header');
+  header.className = 'app-header';
 
   const title = document.createElement('h1');
   title.textContent = 'wwa_puzzle';
 
-  const lead = document.createElement('p');
-  lead.textContent = 'WWA 系の見下ろし2Dパズル。実装中。';
-
-  const list = document.createElement('ol');
-  for (const phase of PHASES) {
-    const item = document.createElement('li');
-    item.dataset['done'] = String(phase.done);
-
-    const mark = document.createElement('span');
-    mark.className = 'mark';
-    mark.textContent = phase.done ? '✓' : '·';
-    mark.setAttribute('aria-hidden', 'true');
-
-    const label = document.createElement('span');
-    label.textContent = `Phase ${phase.no} — ${phase.name}`;
-
-    item.append(mark, label);
-    list.append(item);
+  const picker = document.createElement('select');
+  picker.className = 'map-picker';
+  picker.setAttribute('aria-label', 'マップを選ぶ');
+  for (const entry of maps) {
+    const option = document.createElement('option');
+    option.value = entry.id;
+    option.textContent = entry.name;
+    picker.append(option);
   }
 
-  section.append(title, lead, list);
-  root.replaceChildren(section);
-}
+  header.append(title, picker);
 
-const root = document.querySelector<HTMLElement>('#app');
-if (root) {
-  render(root);
+  const stage = document.createElement('main');
+  stage.className = 'stage';
+
+  root.replaceChildren(header, stage);
+
+  const start = (id: string): void => {
+    const entry = maps.find((candidate) => candidate.id === id) ?? maps[0];
+    if (entry !== undefined) mountGame(stage, entry.map);
+  };
+
+  picker.addEventListener('change', () => start(picker.value));
+  start(picker.value);
 }
