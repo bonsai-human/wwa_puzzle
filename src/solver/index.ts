@@ -6,3 +6,5 @@ export * from './dominance.ts';
 export * from './relax.ts';
 export * from './search.ts';
 export * from './plan.ts';
+export * from './difficulty.ts';
+export * from './protocol.ts';

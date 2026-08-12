@@ -15,7 +15,7 @@ GitHub Pages 上で動作する静的Webアプリ。
 | 1 | `core/` ルールエンジン | 完了 |
 | 2 | `solver/` 探索器 | 完了 |
 | 3 | `game/` 描画・入力・情報パネル | 完了 |
-| 4 | `editor/` マップエディタ | — |
+| 4 | `editor/` マップエディタ | 完了 |
 | 5 | `gen/` 自動生成と難易度評価 | — |
 | 6 | ヒント・詰み検出・共有URL・保存 | — |
 
@@ -55,7 +55,8 @@ npm run shot        # screenshots/ にビューポート別のスクリーンシ
 | `src/core/` | 純粋なルールエンジン。DOM・I/O・乱数に依存しない |
 | `src/solver/` | 解の探索、詰み検出、ヒント。Web Worker 上で動作 |
 | `src/gen/` | マップの自動生成と難易度評価 |
-| `src/editor/` | マップエディタ |
+| `src/editor/` | マップエディタ（ソルバー常駐） |
+| `src/ui/` | DOM 組み立ての下請け |
 | `src/game/` | Canvas 描画・入力・UI |
 | `src/maps/` | 同梱マップ（すべてソルバーで検品済み） |
 

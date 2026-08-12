@@ -135,6 +135,7 @@ export function solveFrom(
   let hopeless = 0;
   let bounded = 0;
   let forced = 0;
+  let branching = 0;
   let truncated = false;
 
   const stats = (): SolveStats => ({
@@ -144,6 +145,7 @@ export function solveFrom(
     hopeless,
     bounded,
     forced,
+    branching,
     truncated,
   });
 
@@ -210,6 +212,7 @@ export function solveFrom(
       continue;
     }
 
+    let accepted = 0;
     for (const branch of expand(map, node.state, region)) {
       const closure = closeForcedMoves(map, branch.state, branch.region);
       forced += closure.actions.length;
@@ -227,6 +230,7 @@ export function solveFrom(
         continue;
       }
 
+      accepted += 1;
       open.push({
         state: closure.state,
         parent: node,
@@ -234,6 +238,7 @@ export function solveFrom(
         bound,
       });
     }
+    if (accepted >= 2) branching += 1;
 
     if (beamWidth !== undefined && open.size > beamWidth) {
       open.trimTo(beamWidth);

@@ -42,6 +42,11 @@ export interface SolveStats {
   /** 強制手として分岐せずに適用した解決の数（設計 §7.3）。 */
   readonly forced: number;
   /**
+   * 支配関係で潰れずに2つ以上の選択肢が残った局面の数。
+   * 設計 §8.3 の `decisionPoints`。プレイヤーが実際に考える必要のある回数にあたる。
+   */
+  readonly branching: number;
+  /**
    * 予算・ビーム幅・中断のいずれかで探索木を削ったか。
    * これが true のとき、解が見つからなくても `dead` と結論してはならない。
    */

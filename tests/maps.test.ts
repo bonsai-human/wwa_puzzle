@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compileMap, parseMapDef } from '../src/core/index.ts';
-import { expand, reachedGoal, solve, verifyPlan } from '../src/solver/index.ts';
-import { initialState } from '../src/core/index.ts';
+import { evaluate, greedyClears, solve, verifyPlan } from '../src/solver/index.ts';
 import { BUILTIN_MAP_DATA } from '../src/maps/index.ts';
 import type { CompiledMap } from '../src/core/index.ts';
 
@@ -14,19 +13,6 @@ import type { CompiledMap } from '../src/core/index.ts';
  */
 
 const maps: CompiledMap[] = BUILTIN_MAP_DATA.map((raw) => compileMap(parseMapDef(raw)));
-
-/** 解決できるものを片端から解決していく素朴な戦略。 */
-function greedyClears(map: CompiledMap): boolean {
-  let state = initialState(map);
-
-  for (let guard = 0; guard < 1000; guard++) {
-    if (reachedGoal(map, state)) return true;
-    const branches = expand(map, state);
-    if (branches.length === 0) return false;
-    state = branches[0]!.state;
-  }
-  return false;
-}
 
 describe.each(maps.map((map) => [map.def.name, map] as const))('%s', (_name, map) => {
   it('データとして妥当である', () => {
@@ -82,6 +68,8 @@ describe('難易度', () => {
     if (descent === undefined) return;
 
     expect(greedyClears(descent)).toBe(false);
+    // エディタが出す指標と同じ経路でも確認する。作り手が見る数字と一致していること。
+    expect(evaluate(descent)).toMatchObject({ status: 'solved', greedyFails: true });
   });
 
   it('三つの間は入門用なので素直に解ける', () => {

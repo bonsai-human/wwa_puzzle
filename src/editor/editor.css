@@ -1,0 +1,189 @@
+/* マップエディタ。設計 §9。 */
+
+.editor {
+  display: grid;
+  gap: 0.75rem;
+  height: 100%;
+  min-height: 0;
+}
+
+@media (min-aspect-ratio: 1 / 1) {
+  .editor {
+    grid-template-columns: minmax(0, 1fr) clamp(18rem, 32vw, 26rem);
+  }
+}
+
+@media (max-aspect-ratio: 1 / 1) {
+  .editor {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .editor-panel {
+    max-height: 50vh;
+  }
+}
+
+.editor .board-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.screen-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.screen-nav .control,
+.tool {
+  min-height: 2.25rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.control.is-active,
+.tool.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+/*
+ * 検定の表示。編集のたびにここが変わる。
+ * 判定を色でも示して、目を離していても異常に気づけるようにする。
+ */
+.status {
+  padding: 0.6rem 0.75rem;
+  border-left: 4px solid var(--line);
+  border-radius: 0 0.35rem 0.35rem 0;
+  background: var(--panel);
+}
+
+.status[data-state='solved'] { border-left-color: var(--ok); }
+.status[data-state='dead'] { border-left-color: var(--danger); }
+.status[data-state='unknown'] { border-left-color: var(--accent); }
+.status[data-state='invalid'] { border-left-color: var(--danger); }
+.status[data-state='pending'] { border-left-color: var(--fg-dim); }
+
+.status-line {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.9rem;
+}
+
+.status-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.status-rows dt {
+  color: var(--fg-dim);
+}
+
+.status-rows dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.issues {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+.properties,
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.field-label {
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+}
+
+.field-input {
+  width: 9rem;
+  min-height: 2.25rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.option-edit {
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+}
+
+.option-edit h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+.coords {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+}
+
+.json {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  resize: vertical;
+}

@@ -92,6 +92,11 @@ canvas {
   color: var(--fg-dim);
 }
 
+.app-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .map-picker {
   min-height: 2.75rem;
   padding: 0 0.6rem;
