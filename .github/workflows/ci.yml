@@ -36,9 +36,33 @@ jobs:
       - name: ビルド
         run: npx vite build
 
-      - name: ビルド成果物を保存
-        uses: actions/upload-artifact@v4
+      - name: 配信用の成果物を保存
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: dist
           path: dist
-          retention-days: 7
+
+  deploy:
+    name: Pages へ配信
+    # 型チェックとテストが通ったときだけ配信する（設計 §12）。
+    needs: check
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    # 配信ジョブにだけ書き込み権限を与える。
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    # 進行中の配信は中断せず、キューに積む。
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

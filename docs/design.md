@@ -663,9 +663,14 @@ interface HintResult {
 - Vite + TypeScript。出力は `dist/`。
 - Worker は `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })` で生成する。
   この形式なら Vite が `base` を考慮したパスを解決する。文字列パス指定はサブパス配信で壊れる。
-- GitHub Actions で `main` への push をトリガに、
-  `actions/configure-pages` → ビルド → `actions/upload-pages-artifact` → `actions/deploy-pages`。
+- GitHub Actions で `main` への push をトリガに、型チェック・テスト・ビルドを行い、
+  同じ実行の中の配信ジョブ（`needs: check`）から `actions/deploy-pages` を呼ぶ。
   リポジトリ設定の Pages ソースを「GitHub Actions」にしておく。
+- **配信を `workflow_run` で別ワークフローに分けない。** `workflow_run` は
+  リポジトリの既定ブランチの文脈で走るため、既定ブランチが `main` でないと
+  古いコミットを配信しかねない。実際、空のリポジトリに最初へ push したブランチが
+  既定になっていたせいで、配信記録が一つ前のコミットを指したままになった。
+  同じ実行の中でジョブを繋げば、この依存が消える。
 - `public/.nojekyll` を置く（Actions 経由では Jekyll は走らないが、設定変更時の事故防止）。
 - アセットはハッシュ付きファイル名。`index.html` は CDN に短時間キャッシュされる点を許容する。
 
