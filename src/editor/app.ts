@@ -203,11 +203,9 @@ export function mountEditor(root: HTMLElement, initial?: MapDef): void {
 
   function drawBoard(): void {
     if (boardView === null || compiled === null) return;
-    boardView.render(
-      initialState(compiled),
-      { screen, from: null, progress: 1 },
-      selected === null ? null : selected.y * compiled.width + selected.x,
-    );
+    boardView.render(initialState(compiled), { screen, from: null, progress: 1 }, {
+      selected: selected === null ? null : selected.y * compiled.width + selected.x,
+    });
   }
 
   function renderScreenNav(draft: DraftState): void {
@@ -426,7 +424,7 @@ export function mountEditor(root: HTMLElement, initial?: MapDef): void {
       statusBox.replaceChildren(el('p', 'status-line', `検定に失敗: ${outcome.message}`));
       return;
     }
-    if (outcome.kind === 'superseded') return;
+    if (outcome.kind !== 'done') return;
 
     const report = outcome.report;
     const rows: [string, string][] = [];

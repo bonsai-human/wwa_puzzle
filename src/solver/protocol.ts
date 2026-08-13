@@ -1,7 +1,8 @@
 /** メインスレッドと Worker のやり取り。 */
 
-import type { MapDef } from '../core/index.ts';
+import type { GameState, MapDef } from '../core/index.ts';
 import type { DifficultyReport } from './difficulty.ts';
+import type { HintResult } from './types.ts';
 
 export interface EvaluateRequest {
   readonly id: number;
@@ -21,7 +22,19 @@ export interface GenerateRequest {
   readonly maxStates?: number;
 }
 
-export type WorkerRequest = EvaluateRequest | GenerateRequest;
+export interface HintRequest {
+  readonly id: number;
+  readonly kind: 'hint';
+  readonly map: unknown;
+  /**
+   * 現在の状態。型付き配列は構造化複製でそのまま渡るので、
+   * 詰め直しは要らない。
+   */
+  readonly state: GameState;
+  readonly maxStates?: number;
+}
+
+export type WorkerRequest = EvaluateRequest | GenerateRequest | HintRequest;
 
 export type WorkerResponse =
   | { readonly id: number; readonly kind: 'progress'; readonly expanded: number }
@@ -35,5 +48,6 @@ export type WorkerResponse =
       readonly meetsCriteria: boolean;
       readonly failures: readonly string[];
     }
+  | { readonly id: number; readonly kind: 'hint'; readonly result: HintResult }
   | { readonly id: number; readonly kind: 'invalid'; readonly issues: readonly string[] }
   | { readonly id: number; readonly kind: 'error'; readonly message: string };

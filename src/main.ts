@@ -2,6 +2,7 @@ import './style.css';
 import './game/game.css';
 import './editor/editor.css';
 import { compileMap, parseMapDef } from './core/index.ts';
+import { decodeMap, parseRoute, shareUrl } from './app/share.ts';
 import { SolverClient } from './solver/client.ts';
 import { mountGame } from './game/app.ts';
 import { mountEditor } from './editor/app.ts';
@@ -47,7 +48,12 @@ if (root !== null) {
   generateButton.className = 'control';
   generateButton.textContent = '生成';
 
-  nav.append(picker, generateButton, modeButton);
+  const shareButton = document.createElement('button');
+  shareButton.type = 'button';
+  shareButton.className = 'control';
+  shareButton.textContent = '共有';
+
+  nav.append(picker, generateButton, shareButton, modeButton);
   header.append(title, nav);
 
   const stage = document.createElement('main');
@@ -59,7 +65,7 @@ if (root !== null) {
     maps.find((entry) => entry.id === picker.value) ?? maps[0];
 
   function render(): void {
-    const editing = window.location.hash.startsWith('#/edit');
+    const editing = parseRoute(window.location.hash).path.startsWith('/edit');
     const entry = currentMap();
     if (entry === undefined) return;
 
@@ -111,8 +117,73 @@ if (root !== null) {
     });
   });
 
+  /**
+   * 共有。サーバーが無いので、マップそのものをURLに圧縮して埋める（設計 §10）。
+   * 長すぎて載らない場合はファイルとして書き出す。
+   */
+  shareButton.addEventListener('click', () => {
+    const entry = currentMap();
+    if (entry === undefined) return;
+
+    void shareUrl(entry.map.def).then(async (url) => {
+      if (url === null) {
+        const blob = new Blob([JSON.stringify(entry.map.def, null, 2)], {
+          type: 'application/json',
+        });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${entry.map.def.id}.json`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+        shareButton.textContent = '長いので保存';
+      } else {
+        try {
+          await navigator.clipboard.writeText(url);
+          shareButton.textContent = 'URLをコピー済み';
+        } catch {
+          // クリップボードは権限で失敗しうる。URLをアドレス欄に載せて手動コピーに回す。
+          window.location.hash = new URL(url).hash;
+          shareButton.textContent = 'URLを表示';
+        }
+      }
+      window.setTimeout(() => (shareButton.textContent = '共有'), 2500);
+    });
+  });
+
+  /** 共有URLで開かれた場合、埋め込まれたマップを取り込む。 */
+  async function adoptSharedMap(): Promise<boolean> {
+    const encoded = parseRoute(window.location.hash).params.get('m');
+    if (encoded === null) return false;
+
+    try {
+      const def = await decodeMap(encoded);
+      if (maps.some((candidate) => candidate.id === def.id)) {
+        picker.value = def.id;
+        return false;
+      }
+
+      const map = compileMap(def);
+      maps.push({ id: def.id, name: `${def.name}（共有）`, map });
+
+      const option = document.createElement('option');
+      option.value = def.id;
+      option.textContent = `${def.name}（共有）`;
+      picker.append(option);
+      picker.value = def.id;
+      return true;
+    } catch (error) {
+      // 壊れた文字列で画面は止めない。ただし黙って無視すると、
+      // 共有された相手には「開いたのに違うマップが出た」としか見えない。
+      shareButton.textContent = '共有マップを読めません';
+      console.warn('共有マップの読み込みに失敗:', error);
+      window.setTimeout(() => (shareButton.textContent = '共有'), 4000);
+      return false;
+    }
+  }
+
   picker.addEventListener('change', render);
   window.addEventListener('hashchange', render);
 
-  render();
+  void adoptSharedMap().then(() => render());
 }

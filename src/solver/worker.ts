@@ -8,6 +8,7 @@
 import { compileMap, validateMapDef } from '../core/index.ts';
 import { generate } from '../gen/index.ts';
 import { evaluate } from './difficulty.ts';
+import { hint } from './search.ts';
 import type { WorkerRequest, WorkerResponse } from './protocol.ts';
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
@@ -54,6 +55,18 @@ ctx.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {
     }
 
     const map = compileMap(validation.map);
+
+    if (request.kind === 'hint') {
+      reply({
+        id: request.id,
+        kind: 'hint',
+        result: hint(map, request.state, {
+          ...(request.maxStates === undefined ? {} : { maxStates: request.maxStates }),
+        }),
+      });
+      return;
+    }
+
     const report = evaluate(map, {
       ...(request.maxStates === undefined ? {} : { maxStates: request.maxStates }),
       // 無反応の時間を作らないよう、途中経過を返す。

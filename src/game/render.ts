@@ -33,6 +33,11 @@ export interface ViewState {
   readonly progress: number;
 }
 
+export interface Marks {
+  readonly selected?: number | null;
+  readonly hint?: number | null;
+}
+
 /** 最小のタイル寸法。これを下回るなら盤面が読めないので、はみ出しても縮めない。 */
 const MIN_TILE = 14;
 
@@ -101,13 +106,14 @@ export class BoardView {
   }
 
   /**
+   * @param marks 盤面に重ねる目印。選択中のマスとヒントの指すマス。
    * @param playerAt プレイヤーを描く位置（マップ座標、小数可）。歩行演出用。
    *   省略時は状態の位置に描く。
    */
   render(
     state: GameState,
     view: ViewState,
-    selected: number | null,
+    marks: Marks = {},
     playerAt?: { readonly x: number; readonly y: number },
   ): void {
     const { ctx } = this;
@@ -117,7 +123,7 @@ export class BoardView {
     const at = playerAt ?? { x: xOf(this.map, state.pos), y: yOf(this.map, state.pos) };
 
     if (view.from === null || view.progress >= 1) {
-      this.drawScreen(state, view.screen, 0, 0, selected, at);
+      this.drawScreen(state, view.screen, 0, 0, marks, at);
     } else {
       // 遷移中は2画面を並べて滑らせる。
       const dx = (view.screen.x - view.from.x) * this.boardWidth;
@@ -125,8 +131,8 @@ export class BoardView {
       const shiftX = -dx * view.progress;
       const shiftY = -dy * view.progress;
 
-      this.drawScreen(state, view.from, shiftX, shiftY, selected, at);
-      this.drawScreen(state, view.screen, shiftX + dx, shiftY + dy, selected, at);
+      this.drawScreen(state, view.from, shiftX, shiftY, marks, at);
+      this.drawScreen(state, view.screen, shiftX + dx, shiftY + dy, marks, at);
     }
 
     this.drawEdgeArrows(view);
@@ -137,7 +143,7 @@ export class BoardView {
     screen: ScreenPos,
     offsetX: number,
     offsetY: number,
-    selected: number | null,
+    marks: Marks,
     playerAt: { readonly x: number; readonly y: number },
   ): void {
     const { ctx, map, tile } = this;
@@ -176,7 +182,8 @@ export class BoardView {
           drawOverlay(target, this.overlayFor(state, cell));
         }
 
-        if (cell === selected) this.drawSelection(target);
+        if (cell === marks.hint) this.drawHint(target);
+        if (cell === marks.selected) this.drawSelection(target);
       }
     }
 
@@ -201,6 +208,22 @@ export class BoardView {
     if (check.reason.kind === 'unbeatable') return 'unbeatable';
     if (check.reason.kind === 'insufficientHp') return 'unaffordable';
     return 'none';
+  }
+
+  /** ヒントが指すマス。選択とは違う見え方にして取り違えを防ぐ。 */
+  private drawHint(target: SpriteContext): void {
+    const { ctx, x, y, size } = target;
+    ctx.save();
+    ctx.strokeStyle = PALETTE.ok;
+    ctx.lineWidth = Math.max(2, size * 0.08);
+    ctx.setLineDash([size * 0.22, size * 0.16]);
+    ctx.strokeRect(
+      x + ctx.lineWidth,
+      y + ctx.lineWidth,
+      size - ctx.lineWidth * 2,
+      size - ctx.lineWidth * 2,
+    );
+    ctx.restore();
   }
 
   private drawSelection(target: SpriteContext): void {

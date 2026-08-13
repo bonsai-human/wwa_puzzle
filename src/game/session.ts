@@ -103,6 +103,29 @@ export class Session {
     return this.visited;
   }
 
+  /** 履歴全体。保存に使う。末尾が現在。 */
+  get history(): readonly GameState[] {
+    return this.past;
+  }
+
+  /**
+   * 保存から復元する。undo をまたげるよう履歴ごと入れ替える。
+   * 壊れたデータを渡されても盤面が破綻しないよう、空なら何もしない。
+   */
+  restore(states: readonly GameState[], visited: readonly number[]): boolean {
+    if (states.length === 0) return false;
+
+    this.past.length = 0;
+    this.past.push(...states);
+    this.future.length = 0;
+    this.selectedCell = null;
+
+    this.visited.clear();
+    for (const screen of visited) this.visited.add(screen);
+    this.markVisited();
+    return true;
+  }
+
   /** 現在の画面。 */
   get screen(): { readonly x: number; readonly y: number } {
     return this.screenOf(this.state.pos);

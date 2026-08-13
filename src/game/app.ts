@@ -7,11 +7,20 @@
 
 import { xOf, yOf } from '../core/index.ts';
 import type { CompiledMap, Direction } from '../core/index.ts';
+import { SolverClient } from '../solver/client.ts';
+import {
+  clearProgress,
+  deserializeState,
+  loadProgress,
+  saveProgress,
+  serializeState,
+} from '../app/storage.ts';
 import { BoardView, renderOverview } from './render.ts';
 import type { ScreenPos, ViewState } from './render.ts';
 import { InfoPanel } from './panel.ts';
 import { Session } from './session.ts';
 import type { TapResult } from './session.ts';
+import type { HintStage } from './panel.ts';
 import { applyTheme } from './theme.ts';
 import { describeEffect } from './format.ts';
 
@@ -23,6 +32,10 @@ const STEP_MS = 45;
 const SWIPE_THRESHOLD = 24;
 /** これ以下ならタップとみなす。 */
 const TAP_SLOP = 12;
+/** 手が止まってから詰み判定を走らせるまでの待ち。連続操作のたびに投げ直さない。 */
+const HINT_DEBOUNCE_MS = 400;
+/** 遊んでいる最中の探索予算。長考させるより、判定できずと言うほうがまし。 */
+const HINT_MAX_STATES = 80_000;
 
 interface Animation {
   /** 通過するセル。先頭は出発点。 */
@@ -41,6 +54,13 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
   applyTheme();
 
   const session = new Session(map);
+  const solver = new SolverClient();
+
+  // 続きから始められるようにする。壊れた保存データは黙って捨てる（storage.ts）。
+  const saved = loadProgress(map.def.id);
+  if (saved !== null) {
+    session.restore(saved.history.map(deserializeState), saved.visitedScreens);
+  }
 
   const layout = document.createElement('div');
   layout.className = 'game';
@@ -87,16 +107,20 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
       session.undo();
       panel.notify(null);
       refresh();
+      afterChange();
     },
     onRedo: () => {
       session.redo();
       panel.notify(null);
       refresh();
+      afterChange();
     },
     onReset: () => {
       session.reset();
+      clearProgress(map.def.id);
       panel.notify(null);
       refresh();
+      afterChange();
     },
     onExchange: (slot) => {
       const option = map.options[slot];
@@ -107,6 +131,7 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
           : '交換できませんでした。',
       );
       refresh();
+      afterChange();
     },
     onResolveSelected: () => {
       const cell = session.selected;
@@ -115,6 +140,11 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
     onToggleOverview: () => {
       renderOverviewNow();
       if (!overviewDialog.open) overviewDialog.showModal();
+    },
+    onHint: () => {
+      // 押すたびに一段だけ開く。最初から答えを出すとパズルが消える。
+      hintStage = Math.min(2, hintStage + 1) as HintStage;
+      publishHint();
     },
   });
 
@@ -126,6 +156,15 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
 
   let camera: ScreenPos = session.screen;
   let animation: Animation | null = null;
+  let hintCell: number | null = null;
+  let hintStage: HintStage = 0;
+  let hintTimer: number | null = null;
+  let lastStatus: 'solvable' | 'dead' | 'unknown' | 'pending' = 'pending';
+  let justDied = false;
+  let hintResult: { cell: number | null; remaining: number | null } = {
+    cell: null,
+    remaining: null,
+  };
 
   function currentView(now: number): { view: ViewState; playerAt: { x: number; y: number } } {
     if (animation === null) {
@@ -168,7 +207,7 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
   function draw(): void {
     frameRequested = false;
     const { view: state, playerAt } = currentView(performance.now());
-    view.render(session.state, state, session.selected, playerAt);
+    view.render(session.state, state, { selected: session.selected, hint: hintCell }, playerAt);
     if (animation !== null) requestFrame();
   }
 
@@ -176,6 +215,95 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
     if (frameRequested) return;
     frameRequested = true;
     requestAnimationFrame(draw);
+  }
+
+  /** ヒントの見え方を段階に合わせて組み立て直す。 */
+  function publishHint(): void {
+    const status = session.cleared ? 'cleared' : lastStatus;
+
+    panel.setHint({
+      status,
+      stage: hintStage,
+      cell: hintStage >= 2 ? hintResult.cell : null,
+      direction: hintResult.cell === null ? null : describeDirection(hintResult.cell),
+      actionsRemaining: hintResult.remaining,
+      justDied,
+    });
+
+    hintCell = hintStage >= 2 ? hintResult.cell : null;
+    panel.update();
+    requestFrame();
+  }
+
+  /** 段階1で出す粗い案内。画面が違えばそちらを、同じなら方角を示す。 */
+  function describeDirection(cell: number): string {
+    const target = session.screenOf(cell);
+    const here = session.screen;
+
+    if (target.x !== here.x || target.y !== here.y) {
+      const horizontal = target.x > here.x ? '右' : target.x < here.x ? '左' : '';
+      const vertical = target.y > here.y ? '下' : target.y < here.y ? '上' : '';
+      return `${vertical}${horizontal}の画面`;
+    }
+
+    const dx = xOf(map, cell) - xOf(map, session.state.pos);
+    const dy = yOf(map, cell) - yOf(map, session.state.pos);
+    const horizontal = dx > 0 ? '東' : dx < 0 ? '西' : '';
+    const vertical = dy > 0 ? '南' : dy < 0 ? '北' : '';
+    return `この画面の${vertical}${horizontal}のほう`;
+  }
+
+  /**
+   * 詰み判定。プレイヤーは詰みを難しさと区別できないので、
+   * 頼まれなくても走らせて、解けなくなったら知らせる（設計 §1 / §7.7）。
+   */
+  function scheduleHint(): void {
+    if (hintTimer !== null) window.clearTimeout(hintTimer);
+
+    if (session.cleared) {
+      lastStatus = 'solvable';
+      publishHint();
+      return;
+    }
+
+    lastStatus = 'pending';
+    publishHint();
+
+    hintTimer = window.setTimeout(() => {
+      const previous = lastStatus;
+      void solver
+        .hint(map.def, session.state, { maxStates: HINT_MAX_STATES })
+        .then((outcome) => {
+          if (outcome.kind !== 'hint') return;
+
+          const result = outcome.result;
+          lastStatus = result.status;
+          justDied = result.status === 'dead' && previous !== 'dead';
+
+          const next = result.nextAction;
+          hintResult = {
+            cell:
+              next === null || next === undefined
+                ? null
+                : next.kind === 'exchange'
+                  ? next.altarCell
+                  : next.cell,
+            remaining: result.actionsRemaining,
+          };
+
+          publishHint();
+        });
+    }, HINT_DEBOUNCE_MS);
+  }
+
+  function persist(): void {
+    saveProgress({
+      version: 1,
+      mapId: map.def.id,
+      history: session.history.map(serializeState),
+      visitedScreens: [...session.visitedScreens],
+      savedAt: Date.now(),
+    });
   }
 
   function refresh(): void {
@@ -190,6 +318,15 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
 
     if (overviewDialog.open) renderOverviewNow();
     requestFrame();
+  }
+
+  /** 状態が動いたときの後始末。保存と詰み判定をまとめてここに寄せる。 */
+  function afterChange(): void {
+    // 手が変わればヒントは開き直し。前の手の答えを出したままにしない。
+    hintStage = 0;
+    hintCell = null;
+    persist();
+    scheduleHint();
   }
 
   function startAnimation(path: readonly number[], previous: number): void {
@@ -236,6 +373,7 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
       case 'resolved': {
         panel.notify(result.kind === 'resolved' ? describeOutcome(result) : null);
         startAnimation(result.path, session.previousPosition);
+        afterChange();
 
         // 祭壇に乗ったら交換シートを開く。
         const object = map.objectAt[session.state.pos] ?? null;
@@ -356,4 +494,8 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
 
   view.fit(boardArea.clientWidth || 320, boardArea.clientHeight || 320);
   refresh();
+  scheduleHint();
+
+  // 別のマップへ移るときに Worker を残さない。
+  window.addEventListener('hashchange', () => solver.dispose(), { once: true });
 }

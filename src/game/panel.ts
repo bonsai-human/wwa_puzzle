@@ -23,6 +23,21 @@ import type { BlockReason } from '../core/index.ts';
 
 type EnemyView = 'cost' | 'stats';
 
+/** ヒントの段階。設計 §7.7：いきなり答えを出さず、段階的に開く。 */
+export type HintStage = 0 | 1 | 2;
+
+export interface HintView {
+  readonly status: 'solvable' | 'dead' | 'unknown' | 'pending' | 'cleared';
+  readonly stage: HintStage;
+  /** 次に解決すべきマス。段階2で盤面にも印がつく。 */
+  readonly cell: number | null;
+  /** 次の対象がある画面。段階1ではここまでしか言わない。 */
+  readonly direction: string | null;
+  readonly actionsRemaining: number | null;
+  /** 直前の一手で詰んだか。 */
+  readonly justDied: boolean;
+}
+
 export interface PanelCallbacks {
   readonly onUndo: () => void;
   readonly onRedo: () => void;
@@ -30,6 +45,7 @@ export interface PanelCallbacks {
   readonly onExchange: (slot: number) => void;
   readonly onResolveSelected: () => void;
   readonly onToggleOverview: () => void;
+  readonly onHint: () => void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -63,6 +79,16 @@ export class InfoPanel {
   private readonly altarButton: HTMLButtonElement;
   private readonly altarDialog = el('dialog', 'sheet');
   private readonly altarBody = el('div', 'sheet-body');
+  private readonly hintBox = el('div', 'hint');
+  private readonly hintButton: HTMLButtonElement;
+  private hintView: HintView = {
+    status: 'pending',
+    stage: 0,
+    cell: null,
+    direction: null,
+    actionsRemaining: null,
+    justDied: false,
+  };
 
   private enemyView: EnemyView = 'cost';
   private message: string | null = null;
@@ -74,6 +100,7 @@ export class InfoPanel {
   ) {
     this.tiers = computeThreatTiers(session.map);
 
+    this.hintButton = button('ヒント', 'control', callbacks.onHint);
     this.undoButton = button('戻す', 'control primary', callbacks.onUndo);
     this.redoButton = button('進める', 'control', callbacks.onRedo);
     this.altarButton = button('祭壇を開く', 'control', () => this.openAltar());
@@ -101,15 +128,25 @@ export class InfoPanel {
     closeRow.append(button('閉じる', 'control', () => this.altarDialog.close()));
     this.altarDialog.append(closeRow);
 
+    const hintSection = el('section', 'section');
+    const hintHead = el('div', 'section-head');
+    hintHead.append(el('h2', undefined, '状況'), this.hintButton);
+    hintSection.append(hintHead, this.hintBox);
+
     this.root.append(
       this.statsBox,
       controls,
       this.altarButton,
+      hintSection,
       this.messageBox,
       detailSection,
       enemySection,
       this.altarDialog,
     );
+  }
+
+  setHint(view: HintView): void {
+    this.hintView = view;
   }
 
   /** 進入に失敗した理由などの短い通知。 */
@@ -126,6 +163,7 @@ export class InfoPanel {
     const state = this.session.state;
 
     this.renderStats(map, state);
+    this.renderHint();
     this.renderEnemies(map, state);
     this.renderDetail(map, state);
 
@@ -171,6 +209,63 @@ export class InfoPanel {
       node.dataset['view'] = view;
       this.enemyToggle.append(node);
     }
+  }
+
+  /**
+   * 詰み・ヒントの表示。
+   *
+   * プレイヤーは詰みを難しさと区別できないので、解けなくなったことは
+   * 黙っていてはいけない。一方で最初から答えを出すとパズルが消えるため、
+   * 押すたびに一段ずつ開く（設計 §7.7）。
+   */
+  private renderHint(): void {
+    const view = this.hintView;
+    this.hintBox.dataset['status'] = view.status;
+    this.hintButton.disabled = view.status !== 'solvable';
+
+    const nodes: HTMLElement[] = [];
+
+    switch (view.status) {
+      case 'pending':
+        nodes.push(el('p', 'hint-line', '確認中…'));
+        break;
+
+      case 'cleared':
+        nodes.push(el('p', 'hint-line', 'クリア済み。'));
+        break;
+
+      case 'dead':
+        nodes.push(
+          el(
+            'p',
+            'hint-line',
+            view.justDied
+              ? 'この一手で詰みました。「戻す」でやり直せます。'
+              : 'この盤面はもう解けません。「戻す」でやり直せます。',
+          ),
+        );
+        break;
+
+      case 'unknown':
+        // 予算切れを「解なし」と言ってはいけない（設計 §7.6）。
+        nodes.push(el('p', 'hint-line', '判定できませんでした。盤面が大きすぎます。'));
+        break;
+
+      case 'solvable':
+        nodes.push(el('p', 'hint-line', 'まだ解けます。'));
+        if (view.stage >= 1 && view.direction !== null) {
+          nodes.push(el('p', 'hint-line', `次は${view.direction}。`));
+        }
+        if (view.stage >= 2 && view.cell !== null) {
+          nodes.push(el('p', 'hint-line', `次に触るのは印のマスです（残り ${view.actionsRemaining ?? '?'} 手）。`));
+        }
+        if (view.stage < 2) {
+          nodes.push(el('p', 'hint-note', 'ヒントを押すともう一段開きます。'));
+        }
+        break;
+    }
+
+    this.hintBox.replaceChildren(...nodes);
   }
 
   private renderStats(map: CompiledMap, state: GameState): void {

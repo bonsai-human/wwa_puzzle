@@ -10,9 +10,10 @@
  * 編集のたびに投げ直す用途には十分足りる。
  */
 
-import type { MapDef } from '../core/index.ts';
+import type { GameState, MapDef } from '../core/index.ts';
 import type { DifficultyReport } from './difficulty.ts';
 import type { WorkerRequest, WorkerResponse } from './protocol.ts';
+import type { HintResult } from './types.ts';
 
 export type SolveOutcome =
   | { readonly kind: 'done'; readonly report: DifficultyReport }
@@ -23,6 +24,7 @@ export type SolveOutcome =
       readonly meetsCriteria: boolean;
       readonly failures: readonly string[];
     }
+  | { readonly kind: 'hint'; readonly result: HintResult }
   | { readonly kind: 'invalid'; readonly issues: readonly string[] }
   | { readonly kind: 'error'; readonly message: string }
   /** 新しい要求に追い越された。呼び出し側は表示を変えなくてよい。 */
@@ -68,6 +70,22 @@ export class SolverClient {
     }), options);
   }
 
+  /**
+   * 現在の状態から、まだ解けるか・次に何をすべきかを問う。
+   *
+   * プレイヤーは詰みを難しさと区別できない。だから詰みの通知は
+   * 親切機能ではなく、ゲームが成立するための部品になる（設計 §1 / §7.7）。
+   */
+  hint(map: unknown, state: GameState, options: { maxStates?: number } = {}): Promise<SolveOutcome> {
+    return this.send((id) => ({
+      id,
+      kind: 'hint',
+      map,
+      state,
+      ...(options.maxStates === undefined ? {} : { maxStates: options.maxStates }),
+    }), {});
+  }
+
   private send(
     build: (id: number) => WorkerRequest,
     options: SolveHandlers,
@@ -93,6 +111,9 @@ export class SolverClient {
         switch (message.kind) {
           case 'done':
             resolve({ kind: 'done', report: message.report });
+            return;
+          case 'hint':
+            resolve({ kind: 'hint', result: message.result });
             return;
           case 'generated':
             resolve({

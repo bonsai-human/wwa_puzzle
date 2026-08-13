@@ -355,3 +355,36 @@
   font-weight: 700;
   text-align: center;
 }
+
+/* --- 状況とヒント ------------------------------------------------------- */
+
+/*
+ * 詰みは黙っていてはいけない情報なので、色でも分かるようにする。
+ * プレイヤーは詰みと「難しいだけ」を自力で区別できない。
+ */
+.hint {
+  padding: 0.5rem 0.65rem;
+  border-left: 4px solid var(--line);
+  border-radius: 0 0.3rem 0.3rem 0;
+  background: var(--panel);
+}
+
+.hint[data-status='solvable'] { border-left-color: var(--ok); }
+.hint[data-status='dead'] { border-left-color: var(--danger); }
+.hint[data-status='unknown'] { border-left-color: var(--accent); }
+.hint[data-status='cleared'] { border-left-color: var(--accent); }
+
+.hint-line {
+  margin: 0 0 0.2rem;
+  font-size: 0.9rem;
+}
+
+.hint-line:last-child {
+  margin-bottom: 0;
+}
+
+.hint-note {
+  margin: 0.3rem 0 0;
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+}
