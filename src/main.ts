@@ -53,13 +53,40 @@ if (root !== null) {
   shareButton.className = 'control';
   shareButton.textContent = '共有';
 
-  nav.append(picker, generateButton, shareButton, modeButton);
+  /*
+   * たまにしか使わない操作はまとめて畳む。ヘッダにボタンを並べるほど
+   * 盤面に使える高さが減り、狭い画面では折り返して2段になる。
+   */
+  const menuDialog = document.createElement('dialog');
+  menuDialog.className = 'sheet';
+  const menuBody = document.createElement('div');
+  menuBody.className = 'sheet-body';
+  const menuTitle = document.createElement('h2');
+  menuTitle.textContent = 'メニュー';
+  menuBody.append(menuTitle, generateButton, shareButton, modeButton);
+  const menuClose = document.createElement('button');
+  menuClose.type = 'button';
+  menuClose.className = 'control';
+  menuClose.textContent = '閉じる';
+  menuClose.addEventListener('click', () => menuDialog.close());
+  const menuActions = document.createElement('div');
+  menuActions.className = 'sheet-actions';
+  menuActions.append(menuClose);
+  menuDialog.append(menuBody, menuActions);
+
+  const menuButton = document.createElement('button');
+  menuButton.type = 'button';
+  menuButton.className = 'control';
+  menuButton.textContent = 'メニュー';
+  menuButton.addEventListener('click', () => menuDialog.showModal());
+
+  nav.append(picker, menuButton);
   header.append(title, nav);
 
   const stage = document.createElement('main');
   stage.className = 'stage';
 
-  root.replaceChildren(header, stage);
+  root.replaceChildren(header, stage, menuDialog);
 
   const currentMap = (): (typeof maps)[number] | undefined =>
     maps.find((entry) => entry.id === picker.value) ?? maps[0];
@@ -69,8 +96,9 @@ if (root !== null) {
     const entry = currentMap();
     if (entry === undefined) return;
 
-    modeButton.textContent = editing ? '遊ぶ' : 'エディタ';
+    modeButton.textContent = editing ? '遊ぶ画面へ' : 'エディタへ';
     picker.hidden = editing;
+    menuDialog.close();
 
     if (editing) mountEditor(stage, entry.map.def);
     else mountGame(stage, entry.map);

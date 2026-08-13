@@ -484,15 +484,34 @@ export function mountGame(root: HTMLElement, map: CompiledMap): void {
 
   // --- 大きさの追従 -----------------------------------------------------
 
-  const observer = new ResizeObserver((entries) => {
-    const box = entries[0]?.contentRect;
-    if (box === undefined || box.width === 0 || box.height === 0) return;
-    view.fit(box.width, box.height);
-    requestFrame();
-  });
-  observer.observe(boardArea);
+  /**
+   * 盤面の大きさを決める。
+   *
+   * 縦長では**盤面の高さを先に確保する**。板の行を `auto` にしてあるので、
+   * ここで決めた寸法がそのまま行の高さになり、パネルは残りをもらう。
+   * 逆にパネルを先に置いて余りを盤面に回すと、パネルの中身が増えるたびに
+   * 盤面が縮み、実機では画面の半分以下になった。
+   */
+  function fitBoard(): void {
+    const portrait = window.innerHeight >= window.innerWidth;
+    const width = boardArea.clientWidth || layout.clientWidth || window.innerWidth;
 
-  view.fit(boardArea.clientWidth || 320, boardArea.clientHeight || 320);
+    // 縦長では高さの上限だけ与える。幅で決まるのが普通で、
+    // 極端に縦の短い端末でだけこの上限が効く。
+    const height = portrait
+      ? Math.max(200, window.innerHeight * 0.56)
+      : boardArea.clientHeight || window.innerHeight;
+
+    view.fit(width, height);
+    requestFrame();
+  }
+
+  // 板そのものではなく外側を見る。canvas の寸法変更で自分を再入させないため。
+  const observer = new ResizeObserver(() => fitBoard());
+  observer.observe(layout);
+  window.addEventListener('resize', fitBoard);
+
+  fitBoard();
   refresh();
   scheduleHint();
 

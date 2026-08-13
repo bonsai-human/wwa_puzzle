@@ -40,15 +40,45 @@
   }
 }
 
-/* 縦長：盤面を上、情報パネルを下に。 */
+/*
+ * 縦長：盤面を上、情報パネルを下に。
+ *
+ * **盤面の高さを先に決め、パネルは残りをもらう。** 逆にすると、
+ * パネルの中身が増えるたびに盤面が縮み、実機では画面の半分以下になった。
+ * 盤面は幅いっぱいの正方形なので、行の高さは canvas 自身が決める（auto）。
+ */
 @media (max-aspect-ratio: 1 / 1) {
   .game {
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.5rem;
   }
 
-  .panel-area {
-    max-height: 46vh;
+  .board-area {
+    overflow: visible;
   }
+}
+
+.panel-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  flex: 1 1 0;
+  min-height: 2.25rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
 }
 
 /* --- 情報パネル ------------------------------------------------------- */
@@ -56,7 +86,8 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  min-height: 0;
 }
 
 .stats {
@@ -78,6 +109,11 @@
 .stat-label {
   font-size: 0.8rem;
   color: var(--fg-dim);
+}
+
+/* 広い画面では長いほうのラベルだけ出す。 */
+.label-short {
+  display: none;
 }
 
 /* 判断材料はすべて数字なので、小画面でも数値だけは縮めない。 */
@@ -294,6 +330,10 @@
   margin-bottom: 0.75rem;
 }
 
+.sheet-body > .control {
+  width: 100%;
+}
+
 .sheet-actions {
   display: flex;
   justify-content: flex-end;
@@ -387,4 +427,86 @@
   margin: 0.3rem 0 0;
   color: var(--fg-dim);
   font-size: 0.8rem;
+}
+
+/* --- 狭い画面での詰め --------------------------------------------------- */
+
+/*
+ * ここは基本規則より**後ろ**に置くこと。メディアクエリは詳細度を上げないので、
+ * 同じセレクタなら後に書いたほうが勝つ。前に置くと丸ごと無視される。
+ */
+@media (max-aspect-ratio: 1 / 1) {
+  /* 数値は1行に固定する。折り返すとその高さぶん盤面が削られる。 */
+  .stats {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.3rem;
+    scrollbar-width: none;
+  }
+
+  .stats::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stat {
+    flex: 0 0 auto;
+    gap: 0.35rem;
+    padding: 0.15rem 0.5rem;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+  }
+
+  .label-long {
+    display: none;
+  }
+
+  .label-short {
+    display: inline;
+  }
+
+  .stat-value {
+    font-size: 1rem;
+  }
+
+  .controls {
+    flex-wrap: nowrap;
+  }
+
+  .controls .control {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 2.5rem;
+    padding: 0;
+    font-size: 0.9rem;
+  }
+
+  /* 節はタブで切り替える。同時に出すと縦に積み上がる。 */
+  .panel-section:not(.is-active) {
+    display: none;
+  }
+
+  .panel-section {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  /* タブに書いてある見出しをもう一度出さない。 */
+  .panel-section > h2 {
+    display: none;
+  }
+
+  .section-head {
+    justify-content: flex-end;
+    margin-bottom: 0.3rem;
+  }
+}
+
+/* 横長では全部同時に見せる。場所があるのに切り替えさせる理由がない。 */
+@media (min-aspect-ratio: 1 / 1) {
+  .panel-tabs {
+    display: none;
+  }
 }

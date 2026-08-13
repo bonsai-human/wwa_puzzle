@@ -81,6 +81,9 @@ export class InfoPanel {
   private readonly altarBody = el('div', 'sheet-body');
   private readonly hintBox = el('div', 'hint');
   private readonly hintButton: HTMLButtonElement;
+  private readonly tabBar = el('div', 'panel-tabs');
+  private sections: HTMLElement[] = [];
+  private activeTab = 'status';
   private hintView: HintView = {
     status: 'pending',
     stage: 0,
@@ -100,27 +103,34 @@ export class InfoPanel {
   ) {
     this.tiers = computeThreatTiers(session.map);
 
-    this.hintButton = button('ヒント', 'control', callbacks.onHint);
+    this.hintButton = button('ヒント', 'control', () => {
+      this.showTab('status');
+      callbacks.onHint();
+    });
     this.undoButton = button('戻す', 'control primary', callbacks.onUndo);
     this.redoButton = button('進める', 'control', callbacks.onRedo);
     this.altarButton = button('祭壇を開く', 'control', () => this.openAltar());
 
+    // 常時見せる操作は4つまで。狭い画面では1行に収まらないと、
+    // そのぶん盤面の高さが削られる。
     const controls = el('div', 'controls');
     controls.append(
       this.undoButton,
       this.redoButton,
-      button('最初から', 'control', callbacks.onReset),
-      button('全体マップ', 'control', callbacks.onToggleOverview),
+      button('地図', 'control', callbacks.onToggleOverview),
+      this.hintButton,
     );
 
     this.buildEnemyToggle();
 
-    const enemySection = el('section', 'section');
+    const enemySection = el('section', 'section panel-section');
+    enemySection.dataset['tab'] = 'enemies';
     const enemyHead = el('div', 'section-head');
     enemyHead.append(el('h2', undefined, 'この画面の敵'), this.enemyToggle);
     enemySection.append(enemyHead, this.enemyBox);
 
-    const detailSection = el('section', 'section');
+    const detailSection = el('section', 'section panel-section');
+    detailSection.dataset['tab'] = 'detail';
     detailSection.append(el('h2', undefined, '選択中'), this.detailBox);
 
     this.altarDialog.append(this.altarBody);
@@ -128,21 +138,49 @@ export class InfoPanel {
     closeRow.append(button('閉じる', 'control', () => this.altarDialog.close()));
     this.altarDialog.append(closeRow);
 
-    const hintSection = el('section', 'section');
-    const hintHead = el('div', 'section-head');
-    hintHead.append(el('h2', undefined, '状況'), this.hintButton);
-    hintSection.append(hintHead, this.hintBox);
+    const hintSection = el('section', 'section panel-section');
+    hintSection.dataset['tab'] = 'status';
+    hintSection.append(el('h2', undefined, '状況'), this.hintBox);
+
+    // 狭い画面では3つの節を切り替えて出す。全部同時に出すと、
+    // その高さぶんだけ盤面が縮む。横長では CSS 側でタブを畳んで全部見せる。
+    for (const [tab, label] of [
+      ['status', '状況'],
+      ['enemies', '敵'],
+      ['detail', '選択'],
+    ] as const) {
+      const node = button(label, 'tab', () => this.showTab(tab));
+      node.dataset['tab'] = tab;
+      this.tabBar.append(node);
+    }
+
+    this.sections = [hintSection, enemySection, detailSection];
 
     this.root.append(
       this.statsBox,
       controls,
       this.altarButton,
-      hintSection,
       this.messageBox,
-      detailSection,
+      this.tabBar,
+      hintSection,
       enemySection,
+      detailSection,
       this.altarDialog,
     );
+
+    this.showTab('status');
+  }
+
+  /** 節の切り替え。横長では CSS がタブを畳むので、この状態は無視される。 */
+  showTab(tab: string): void {
+    this.activeTab = tab;
+
+    for (const section of this.sections) {
+      section.classList.toggle('is-active', section.dataset['tab'] === tab);
+    }
+    for (const node of this.tabBar.children) {
+      node.classList.toggle('is-active', (node as HTMLElement).dataset['tab'] === tab);
+    }
   }
 
   setHint(view: HintView): void {
@@ -268,30 +306,39 @@ export class InfoPanel {
     this.hintBox.replaceChildren(...nodes);
   }
 
+  /**
+   * 自分の数値。
+   *
+   * 狭い画面では長短2つのラベルを持たせ、CSS で切り替える。
+   * 1行に収まらないと右端で数字が切れるが、**数字はこのゲームの判断材料そのもの**で、
+   * 切れて読めないのは折り返して盤面が縮むのと同じくらい悪い。
+   */
   private renderStats(map: CompiledMap, state: GameState): void {
-    const entries: [string, string, string | null][] = [
-      ['HP', String(state.hp), null],
-      ['攻撃力', String(state.atk), null],
-      ['防御力', String(state.def), null],
-      ['オーブ', String(state.orbs[0] ?? 0), null],
+    const entries: [string, string, string, string | null][] = [
+      ['HP', 'HP', String(state.hp), null],
+      ['攻撃力', '攻', String(state.atk), null],
+      ['防御力', '防', String(state.def), null],
+      ['オーブ', '珠', String(state.orbs[0] ?? 0), null],
     ];
 
     map.keyColors.forEach((color, id) => {
-      entries.push([`${color}の鍵`, String(state.keys[id] ?? 0), keyStyle(id).color]);
+      entries.push([`${color}の鍵`, color, String(state.keys[id] ?? 0), keyStyle(id).color]);
     });
 
     if (state.masterKey > 0) {
       entries.push([
         'マスターキー',
+        'master',
         map.masterKeyMode === 'permanent' ? '所持' : String(state.masterKey),
         null,
       ]);
     }
 
     this.statsBox.replaceChildren(
-      ...entries.map(([label, value, accent]) => {
+      ...entries.map(([long, short, value, accent]) => {
         const box = el('div', 'stat');
-        const name = el('span', 'stat-label', label);
+        const name = el('span', 'stat-label');
+        name.append(el('span', 'label-long', long), el('span', 'label-short', short));
         if (accent !== null) name.style.color = accent;
         box.append(name, el('span', 'stat-value', value));
         return box;
@@ -365,6 +412,8 @@ export class InfoPanel {
 
   private renderDetail(map: CompiledMap, state: GameState): void {
     const cell = this.session.selected;
+    // 選んだのに別のタブが出ていると、何も起きていないように見える。
+    if (cell !== null && this.activeTab !== 'detail') this.showTab('detail');
     if (cell === null) {
       this.detailBox.replaceChildren(
         el('p', 'empty', 'マスを選ぶと、そのマスの情報がすべてここに出ます。'),
