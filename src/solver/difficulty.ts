@@ -10,7 +10,7 @@ import { initialState } from '../core/index.ts';
 import type { CompiledMap } from '../core/index.ts';
 import { expand, reachedGoal } from './macro.ts';
 import { solve } from './search.ts';
-import type { SolveOptions, SolveStatus } from './types.ts';
+import type { MacroAction, SolveOptions, SolveStatus } from './types.ts';
 
 /**
  * 「解決できるものを片端から解決する」だけでクリアできるか。
@@ -39,6 +39,15 @@ export interface DifficultyReport {
   readonly status: SolveStatus;
   /** 最適解の終了時HP。小さいほど余裕が無い。 */
   readonly hpMargin: number | null;
+  /**
+   * 最適解が**実際に手に入れた**HPのうち、使い切った割合。0〜1。
+   *
+   * 余裕を終了時HPの絶対値で測ると、初期HPも回復量もマップごとに違うので
+   * 比較にならない。かといってマップ上の回復の総量を分母に取ると、
+   * 最適解が寄らなかった支道の回復まで「余っている」ことになってしまい、
+   * 囮を置くほど余裕が大きいと判定される。分母は解が実際に集めた分だけにする。
+   */
+  readonly hpTightness: number | null;
   /** 解に必要なマクロ行動の数。 */
   readonly criticalPath: number | null;
   /** 貪欲法で解けなかったか。解けてしまうなら考えどころが無い。 */
@@ -49,12 +58,36 @@ export interface DifficultyReport {
   readonly truncated: boolean;
 }
 
+/** 手順に沿って実際に手に入れたHPの総量（初期値＋道中の回復）。 */
+function collectedHp(map: CompiledMap, plan: readonly MacroAction[]): number {
+  let total = map.initial.hp;
+
+  for (const action of plan) {
+    if (action.kind === 'resolve') {
+      const object = map.objectAt[action.cell] ?? null;
+      if (object?.type === 'item' && object.effect.kind === 'hp') total += object.effect.amount;
+    } else if (action.kind === 'exchange') {
+      const effect = map.options[action.slot]?.effect;
+      if (effect?.kind === 'hp') total += effect.amount;
+    }
+  }
+
+  return total;
+}
+
 export function evaluate(map: CompiledMap, options: SolveOptions = {}): DifficultyReport {
   const result = solve(map, options);
+
+  const collected = result.plan === null ? null : collectedHp(map, result.plan);
+  const tightness =
+    result.finalHp === null || collected === null || collected <= 0
+      ? null
+      : Math.max(0, Math.min(1, 1 - result.finalHp / collected));
 
   return {
     status: result.status,
     hpMargin: result.finalHp,
+    hpTightness: tightness,
     criticalPath: result.plan?.length ?? null,
     // 解けないマップに貪欲法の合否を問うても意味がない。
     greedyFails: result.status === 'solved' ? !greedyClears(map) : false,

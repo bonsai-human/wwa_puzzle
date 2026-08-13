@@ -10,11 +10,19 @@
  * 編集のたびに投げ直す用途には十分足りる。
  */
 
+import type { MapDef } from '../core/index.ts';
 import type { DifficultyReport } from './difficulty.ts';
-import type { SolveRequest, WorkerResponse } from './protocol.ts';
+import type { WorkerRequest, WorkerResponse } from './protocol.ts';
 
 export type SolveOutcome =
   | { readonly kind: 'done'; readonly report: DifficultyReport }
+  | {
+      readonly kind: 'generated';
+      readonly map: MapDef;
+      readonly report: DifficultyReport;
+      readonly meetsCriteria: boolean;
+      readonly failures: readonly string[];
+    }
   | { readonly kind: 'invalid'; readonly issues: readonly string[] }
   | { readonly kind: 'error'; readonly message: string }
   /** 新しい要求に追い越された。呼び出し側は表示を変えなくてよい。 */
@@ -34,6 +42,36 @@ export class SolverClient {
    * 打ち切られた側の Promise は `superseded` で解決する。
    */
   request(map: unknown, options: { maxStates?: number } & SolveHandlers = {}): Promise<SolveOutcome> {
+    return this.send((id) => ({
+      id,
+      kind: 'evaluate',
+      map,
+      ...(options.maxStates === undefined ? {} : { maxStates: options.maxStates }),
+    }), options);
+  }
+
+  /**
+   * マップを自動生成する。解き直しを何十回も含むので、評価より一桁重い。
+   * メインスレッドで回すと1秒近く固まるため、必ずこちら経由で呼ぶ。
+   */
+  generate(
+    request: { seed: number; screensX?: number; screensY?: number; attempts?: number },
+    options: SolveHandlers = {},
+  ): Promise<SolveOutcome> {
+    return this.send((id) => ({
+      id,
+      kind: 'generate',
+      seed: request.seed,
+      ...(request.screensX === undefined ? {} : { screensX: request.screensX }),
+      ...(request.screensY === undefined ? {} : { screensY: request.screensY }),
+      ...(request.attempts === undefined ? {} : { attempts: request.attempts }),
+    }), options);
+  }
+
+  private send(
+    build: (id: number) => WorkerRequest,
+    options: SolveHandlers,
+  ): Promise<SolveOutcome> {
     this.abort();
 
     const id = this.nextId++;
@@ -52,13 +90,25 @@ export class SolverClient {
         }
 
         this.settle = null;
-        resolve(
-          message.kind === 'done'
-            ? { kind: 'done', report: message.report }
-            : message.kind === 'invalid'
-              ? { kind: 'invalid', issues: message.issues }
-              : { kind: 'error', message: message.message },
-        );
+        switch (message.kind) {
+          case 'done':
+            resolve({ kind: 'done', report: message.report });
+            return;
+          case 'generated':
+            resolve({
+              kind: 'generated',
+              map: message.map,
+              report: message.report,
+              meetsCriteria: message.meetsCriteria,
+              failures: message.failures,
+            });
+            return;
+          case 'invalid':
+            resolve({ kind: 'invalid', issues: message.issues });
+            return;
+          default:
+            resolve({ kind: 'error', message: message.message });
+        }
       };
 
       worker.onerror = (event) => {
@@ -66,12 +116,7 @@ export class SolverClient {
         resolve({ kind: 'error', message: event.message || 'Worker が異常終了しました' });
       };
 
-      const request: SolveRequest = {
-        id,
-        map,
-        ...(options.maxStates === undefined ? {} : { maxStates: options.maxStates }),
-      };
-      worker.postMessage(request);
+      worker.postMessage(build(id));
     });
   }
 

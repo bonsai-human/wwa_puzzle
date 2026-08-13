@@ -1,6 +1,8 @@
 import './style.css';
 import './game/game.css';
 import './editor/editor.css';
+import { compileMap, parseMapDef } from './core/index.ts';
+import { SolverClient } from './solver/client.ts';
 import { mountGame } from './game/app.ts';
 import { mountEditor } from './editor/app.ts';
 import { loadBuiltinMaps } from './maps/index.ts';
@@ -40,7 +42,12 @@ if (root !== null) {
   modeButton.type = 'button';
   modeButton.className = 'control';
 
-  nav.append(picker, modeButton);
+  const generateButton = document.createElement('button');
+  generateButton.type = 'button';
+  generateButton.className = 'control';
+  generateButton.textContent = '生成';
+
+  nav.append(picker, generateButton, modeButton);
   header.append(title, nav);
 
   const stage = document.createElement('main');
@@ -65,6 +72,43 @@ if (root !== null) {
 
   modeButton.addEventListener('click', () => {
     window.location.hash = window.location.hash.startsWith('#/edit') ? '#/play' : '#/edit';
+  });
+
+  /**
+   * 自動生成。解き直しを何十回も含むので Worker に投げる。
+   * メインスレッドで回すと1秒近く固まり、モバイルではさらに伸びる（設計 §7.8）。
+   */
+  const generator = new SolverClient();
+
+  generateButton.addEventListener('click', () => {
+    generateButton.disabled = true;
+    generateButton.textContent = '生成中…';
+
+    const seed = Math.floor(Math.random() * 1_000_000) + 1;
+
+    void generator.generate({ seed }).then((outcome) => {
+      generateButton.disabled = false;
+      generateButton.textContent = '生成';
+
+      if (outcome.kind !== 'generated') {
+        generateButton.textContent = '生成に失敗';
+        window.setTimeout(() => (generateButton.textContent = '生成'), 2000);
+        return;
+      }
+
+      const map = compileMap(parseMapDef(outcome.map));
+      const entry = { id: map.def.id, name: `${map.def.name}${outcome.meetsCriteria ? '' : '（基準未達）'}`, map };
+      maps.push(entry);
+
+      const option = document.createElement('option');
+      option.value = entry.id;
+      option.textContent = entry.name;
+      picker.append(option);
+      picker.value = entry.id;
+
+      window.location.hash = '#/play';
+      render();
+    });
   });
 
   picker.addEventListener('change', render);
