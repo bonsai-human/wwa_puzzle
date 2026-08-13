@@ -136,13 +136,13 @@ export function generateLayout(rng: Rng, options: LayoutOptions): Layout {
     const bottom = screen.y * screenHeight + screenHeight - 2;
 
     const centers: { x: number; y: number }[] = [];
-    const roomCount = rng.int(2, 4);
+    const roomCount = rng.int(3, 5);
 
     for (let i = 0; i < roomCount; i++) {
       // 画面の半分近くまで大きく取る。小さい部屋を細い通路でつなぐと、
       // 洞窟のようになって盤面が読みにくい。
-      const roomWidth = rng.int(4, Math.max(4, Math.round((right - left) * 0.62)));
-      const roomHeight = rng.int(4, Math.max(4, Math.round((bottom - top) * 0.62)));
+      const roomWidth = rng.int(5, Math.max(5, Math.round((right - left) * 0.8)));
+      const roomHeight = rng.int(5, Math.max(5, Math.round((bottom - top) * 0.8)));
       const x0 = rng.int(left, Math.max(left, right - roomWidth + 1));
       const y0 = rng.int(top, Math.max(top, bottom - roomHeight + 1));
 

@@ -4,12 +4,23 @@
   "name": "三つの間",
   "width": 16,
   "height": 16,
-  "screen": { "width": 16, "height": 16 },
-
-  "start": { "x": 2, "y": 2 },
-  "goal": { "x": 13, "y": 13 },
-  "player": { "hp": 30, "atk": 10, "def": 2 },
-
+  "screen": {
+    "width": 16,
+    "height": 16
+  },
+  "start": {
+    "x": 2,
+    "y": 2
+  },
+  "goal": {
+    "x": 13,
+    "y": 13
+  },
+  "player": {
+    "hp": 40,
+    "atk": 10,
+    "def": 2
+  },
   "terrain": [
     "################",
     "#....#....#....#",
@@ -28,39 +39,443 @@
     "#....#....#....#",
     "################"
   ],
-
   "objects": [
-    { "type": "item", "x": 1, "y": 1, "effect": { "kind": "atk", "amount": 4 } },
-    { "type": "item", "x": 4, "y": 4, "effect": { "kind": "hp", "amount": 20 } },
-    { "type": "enemy", "x": 2, "y": 11, "name": "野犬", "hp": 12, "atk": 6, "def": 4, "orb": 1 },
-
-    { "type": "enemy", "x": 5, "y": 7, "name": "門番", "hp": 30, "atk": 8, "def": 8, "orb": 1 },
-
-    { "type": "enemy", "x": 7, "y": 3, "name": "斥候", "hp": 20, "atk": 10, "def": 6, "orb": 1 },
-    { "type": "enemy", "x": 6, "y": 13, "name": "斥候", "hp": 20, "atk": 10, "def": 6, "orb": 1 },
+    {
+      "type": "item",
+      "x": 1,
+      "y": 1,
+      "effect": {
+        "kind": "atk",
+        "amount": 2
+      }
+    },
+    {
+      "type": "item",
+      "x": 2,
+      "y": 1,
+      "effect": {
+        "kind": "atk",
+        "amount": 2
+      }
+    },
+    {
+      "type": "item",
+      "x": 1,
+      "y": 3,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 2,
+      "y": 3,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 3,
+      "y": 3,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 4,
+      "y": 3,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "enemy",
+      "x": 1,
+      "y": 5,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "enemy",
+      "x": 2,
+      "y": 5,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "enemy",
+      "x": 3,
+      "y": 5,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "item",
+      "x": 1,
+      "y": 9,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 2,
+      "y": 9,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 3,
+      "y": 9,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 4,
+      "y": 9,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "enemy",
+      "x": 2,
+      "y": 11,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "enemy",
+      "x": 3,
+      "y": 11,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "item",
+      "x": 1,
+      "y": 13,
+      "effect": {
+        "kind": "def",
+        "amount": 1
+      }
+    },
+    {
+      "type": "item",
+      "x": 3,
+      "y": 13,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 4,
+      "y": 13,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "enemy",
+      "x": 5,
+      "y": 7,
+      "name": "門番",
+      "hp": 40,
+      "atk": 14,
+      "def": 8,
+      "orb": 1
+    },
+    {
+      "type": "item",
+      "x": 6,
+      "y": 2,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 7,
+      "y": 2,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 8,
+      "y": 2,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 9,
+      "y": 2,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "enemy",
+      "x": 7,
+      "y": 4,
+      "name": "斥候",
+      "hp": 24,
+      "atk": 12,
+      "def": 6,
+      "orb": 1
+    },
+    {
+      "type": "enemy",
+      "x": 8,
+      "y": 4,
+      "name": "斥候",
+      "hp": 24,
+      "atk": 12,
+      "def": 6,
+      "orb": 1
+    },
+    {
+      "type": "item",
+      "x": 6,
+      "y": 6,
+      "effect": {
+        "kind": "atk",
+        "amount": 2
+      }
+    },
+    {
+      "type": "item",
+      "x": 7,
+      "y": 6,
+      "effect": {
+        "kind": "atk",
+        "amount": 2
+      }
+    },
+    {
+      "type": "item",
+      "x": 6,
+      "y": 12,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 7,
+      "y": 12,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 8,
+      "y": 12,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "enemy",
+      "x": 6,
+      "y": 14,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "enemy",
+      "x": 7,
+      "y": 14,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "enemy",
+      "x": 8,
+      "y": 14,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
     {
       "type": "altar",
       "x": 8,
-      "y": 11,
+      "y": 10,
       "id": "shrine",
       "options": [
         {
           "id": "red-key",
           "label": "赤い鍵",
-          "cost": 2,
-          "effect": { "kind": "key", "key": "赤", "amount": 1 },
+          "cost": 4,
+          "effect": {
+            "kind": "key",
+            "key": "赤",
+            "amount": 1
+          },
           "stock": 1
         },
         {
           "id": "power",
           "label": "力の証",
-          "cost": 2,
-          "effect": { "kind": "atk", "amount": 3 },
+          "cost": 4,
+          "effect": {
+            "kind": "atk",
+            "amount": 3
+          },
           "stock": 1
         }
       ]
     },
-
-    { "type": "door", "x": 10, "y": 7, "key": "赤" }
+    {
+      "type": "door",
+      "x": 10,
+      "y": 7,
+      "key": "赤"
+    },
+    {
+      "type": "item",
+      "x": 11,
+      "y": 2,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 12,
+      "y": 2,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 13,
+      "y": 2,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "enemy",
+      "x": 12,
+      "y": 4,
+      "name": "亡霊",
+      "hp": 30,
+      "atk": 20,
+      "def": 10,
+      "orb": 1
+    },
+    {
+      "type": "item",
+      "x": 12,
+      "y": 5,
+      "effect": {
+        "kind": "def",
+        "amount": 2
+      }
+    },
+    {
+      "type": "enemy",
+      "x": 11,
+      "y": 10,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "enemy",
+      "x": 12,
+      "y": 10,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "enemy",
+      "x": 13,
+      "y": 10,
+      "name": "野犬",
+      "hp": 12,
+      "atk": 5,
+      "def": 4,
+      "orb": 1
+    },
+    {
+      "type": "item",
+      "x": 11,
+      "y": 12,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    },
+    {
+      "type": "item",
+      "x": 12,
+      "y": 12,
+      "effect": {
+        "kind": "hp",
+        "amount": 6
+      }
+    }
   ]
 }

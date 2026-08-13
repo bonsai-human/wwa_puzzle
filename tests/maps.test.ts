@@ -34,6 +34,20 @@ describe.each(maps.map((map) => [map.def.name, map] as const))('%s', (_name, map
     expect(verified).toMatchObject({ ok: true, finalHp: result.finalHp });
   });
 
+  it('盤面が薄くない', () => {
+    /**
+     * 物量そのものが遊び心地に効く。物体が10個や20個しか無い盤面は、
+     * 規則がどれだけ正しくても「歩いているだけ」の時間が大半になる。
+     *
+     * 1画面あたりの物体数では測らない。壁の多い画面は埋める床が少ないので、
+     * 同じ密度でも数が小さく出る。**歩ける床のうち何割が埋まっているか**で見る。
+     */
+    let floor = 0;
+    for (const row of map.def.terrain) for (const cell of row) if (cell === '.') floor += 1;
+
+    expect(map.def.objects.length / floor).toBeGreaterThanOrEqual(0.15);
+  });
+
   it('壁で封じられたオブジェクトが無い', () => {
     // 触れようのないオブジェクトは、盤面を読む手間を増やすだけで何の判断も生まない。
     // 敵や扉を無視して壁だけで到達可能性を見れば、置き忘れの検出になる。

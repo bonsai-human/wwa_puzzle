@@ -19,19 +19,22 @@ import type { Rng } from './rng.ts';
 export interface PopulateOptions {
   /** 関門の撃破コストが、その時点のHPに占める割合の範囲。小さいほど易しい。 */
   readonly gateCostRatio: readonly [number, number];
-  /** 1画面あたりに置く強化アイテムの数。 */
-  readonly itemsPerScreen: readonly [number, number];
-  /** 1画面あたりに置くオーブ源の敵の数。 */
-  readonly orbEnemiesPerScreen: readonly [number, number];
+  /** 1画面あたりに置く強化アイテムの「かたまり」の数。 */
+  readonly itemGroupsPerScreen: readonly [number, number];
+  /** 1画面あたりに置くオーブ源の敵の「かたまり」の数。 */
+  readonly orbGroupsPerScreen: readonly [number, number];
+  /** ひとかたまりに何個並べるか。 */
+  readonly groupSize: readonly [number, number];
   /** 支道に囮を置く確率。 */
   readonly decoyChance: number;
 }
 
 export const DEFAULT_POPULATE: PopulateOptions = {
   gateCostRatio: [0.45, 0.7],
-  itemsPerScreen: [2, 3],
-  orbEnemiesPerScreen: [1, 3],
-  decoyChance: 0.6,
+  itemGroupsPerScreen: [4, 6],
+  orbGroupsPerScreen: [3, 4],
+  groupSize: [2, 4],
+  decoyChance: 0.7,
 };
 
 export interface Population {
@@ -63,10 +66,116 @@ export function populate(rng: Rng, layout: Layout, options: PopulateOptions): Po
 
   const pointOf = (cell: number): Point => ({ x: cell % width, y: Math.floor(cell / width) });
 
+  // 空きセルは集合でも持つ。かたまりで置くには「隣が空いているか」を問える必要がある。
+  const available = new Map<string, Set<number>>();
+  for (const [key, cells] of layout.freeCells) available.set(key, new Set(cells));
+
   /** 画面の空きセルを1つ取り出す。使い切ったら null。 */
   const takeCell = (screen: ScreenIndex): number | null => {
     const cells = layout.freeCells.get(screenKey(screen));
-    return cells === undefined || cells.length === 0 ? null : cells.pop()!;
+    if (cells === undefined) return null;
+
+    while (cells.length > 0) {
+      const cell = cells.pop()!;
+      const set = available.get(screenKey(screen));
+      if (set?.delete(cell) === true) return cell;
+    }
+    return null;
+  };
+
+  /** 画面ごとの、すでに何かを置いたセル。かたまりの間隔を測るのに使う。 */
+  const placedIn = new Map<string, number[]>();
+
+  const distanceToPlaced = (screen: ScreenIndex, cell: number): number => {
+    const placed = placedIn.get(screenKey(screen));
+    if (placed === undefined || placed.length === 0) return Number.POSITIVE_INFINITY;
+
+    const x = cell % width;
+    const y = Math.floor(cell / width);
+    let nearest = Number.POSITIVE_INFINITY;
+    for (const other of placed) {
+      const dx = Math.abs((other % width) - x);
+      const dy = Math.abs(Math.floor(other / width) - y);
+      nearest = Math.min(nearest, Math.max(dx, dy));
+    }
+    return nearest;
+  };
+
+  /**
+   * かたまりの先頭を選ぶ。
+   *
+   * **一様乱数で選ぶと散らばらない。** 床の2割を埋める程度の物量では、
+   * 一様に選んだ点は必ずどこかに固まり、部屋の一角がまるごと空く。
+   * 実機で見ると「物を増やしたのに薄い部屋がある」という見え方になる。
+   *
+   * 候補をいくつか引いて、すでに置いたものから最も離れているものを採る
+   * （Mitchell の best-candidate 法）。物量を増やさずに散らばりだけが良くなる。
+   */
+  const CANDIDATES = 8;
+
+  const takeHead = (screen: ScreenIndex): number | null => {
+    const drawn: number[] = [];
+    for (let i = 0; i < CANDIDATES; i++) {
+      const cell = takeCell(screen);
+      if (cell === null) break;
+      drawn.push(cell);
+    }
+    if (drawn.length === 0) return null;
+
+    let best = drawn[0]!;
+    let bestDistance = distanceToPlaced(screen, best);
+    for (let i = 1; i < drawn.length; i++) {
+      const distance = distanceToPlaced(screen, drawn[i]!);
+      if (distance > bestDistance) {
+        best = drawn[i]!;
+        bestDistance = distance;
+      }
+    }
+
+    // 採らなかった候補は戻す。取り出した順は元から無作為なので、順序は問わない。
+    const set = available.get(screenKey(screen));
+    const cells = layout.freeCells.get(screenKey(screen));
+    for (const cell of drawn) {
+      if (cell === best) continue;
+      set?.add(cell);
+      cells?.push(cell);
+    }
+
+    return best;
+  };
+
+  const markPlaced = (screen: ScreenIndex, cell: number): void => {
+    const placed = placedIn.get(screenKey(screen));
+    if (placed === undefined) placedIn.set(screenKey(screen), [cell]);
+    else placed.push(cell);
+  };
+
+  /**
+   * 横に並んだ空きセルをまとめて取る。
+   *
+   * **1個ずつ散らすのではなく、かたまりで置く。** 参考にした原典の盤面は、
+   * 同じ壺が4つ横に並び、同じ敵が2〜4体のかたまりで置かれている。
+   * 散らすと物量を増やしても「散らかっている」だけになり、
+   * 盤面に読み取れる形が出てこない。
+   */
+  const takeRun = (screen: ScreenIndex, length: number): number[] => {
+    const set = available.get(screenKey(screen));
+    if (set === undefined) return [];
+
+    const head = takeHead(screen);
+    if (head === null) return [];
+
+    const run = [head];
+    for (let i = 1; i < length; i++) {
+      const next = head + i;
+      // 行をまたいだら並びではなくなる。
+      if (Math.floor(next / width) !== Math.floor(head / width)) break;
+      if (!set.delete(next)) break;
+      run.push(next);
+    }
+
+    for (const cell of run) markPlaced(screen, cell);
+    return run;
   };
 
   const place = (screen: ScreenIndex, object: ObjectDef | null): boolean => {
@@ -75,6 +184,13 @@ export function populate(rng: Rng, layout: Layout, options: PopulateOptions): Po
     if (cell === null) return false;
     objects.push({ ...object, ...pointOf(cell) });
     return true;
+  };
+
+  /** 同じものをかたまりで置く。置けた数を返す。 */
+  const placeGroup = (screen: ScreenIndex, object: ObjectDef, length: number): number => {
+    const run = takeRun(screen, length);
+    for (const cell of run) objects.push({ ...object, ...pointOf(cell) });
+    return run.length;
   };
 
   const startCell = takeCell(layout.path[0]!);
@@ -94,20 +210,34 @@ export function populate(rng: Rng, layout: Layout, options: PopulateOptions): Po
 
   // --- 強化とオーブ源 ---------------------------------------------------
 
+  /**
+   * 強化アイテム。**同じものを並べて置き、1個あたりの効果はその分だけ小さくする。**
+   * 総量は以前と同じで、見た目の物量だけが増える。
+   * 1個の効果を据え置いたまま数だけ増やすと、ただのインフレになる。
+   */
   const placeItems = (screen: ScreenIndex): void => {
-    const count = rng.int(options.itemsPerScreen[0], options.itemsPerScreen[1]);
+    const groups = rng.int(options.itemGroupsPerScreen[0], options.itemGroupsPerScreen[1]);
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < groups; i++) {
+      const length = rng.int(options.groupSize[0], options.groupSize[1]);
       const roll = rng.next();
-      if (roll < 0.4) {
-        const amount = rng.int(2, 4);
-        if (place(screen, { type: 'item', effect: { kind: 'atk', amount } })) virtual.atk += amount;
-      } else if (roll < 0.7) {
-        const amount = rng.int(1, 3);
-        if (place(screen, { type: 'item', effect: { kind: 'def', amount } })) virtual.def += amount;
+
+      if (roll < 0.35) {
+        const amount = 1;
+        virtual.atk += amount * placeGroup(screen, { type: 'item', effect: { kind: 'atk', amount } }, length);
+      } else if (roll < 0.5) {
+        /*
+         * **防御だけは絶対にかたまりで置かない。** 防御は敵1体につき1発ぶんではなく
+         * 全部の敵の全部の攻撃から引かれる。4個並べて +4 すると、盤面の敵が
+         * まとめて無害になる。実測では、防御が24まで育った結果、
+         * 解の全行程で「HPを取る敵」が1体しか残らなかった。
+         * 締める対象が無くなるので、難易度の調整そのものが効かなくなる。
+         */
+        const amount = 1;
+        virtual.def += amount * placeGroup(screen, { type: 'item', effect: { kind: 'def', amount } }, 1);
       } else {
-        const amount = rng.int(15, 40);
-        if (place(screen, { type: 'item', effect: { kind: 'hp', amount } })) virtual.hp += amount;
+        const amount = rng.int(6, 14);
+        virtual.hp += amount * placeGroup(screen, { type: 'item', effect: { kind: 'hp', amount } }, length);
       }
     }
   };
@@ -123,9 +253,9 @@ export function populate(rng: Rng, layout: Layout, options: PopulateOptions): Po
    * オーブ集めは経済の配管であって、考えどころはここではなく関門と祭壇にある。
    */
   const placeOrbEnemies = (screen: ScreenIndex): void => {
-    const count = rng.int(options.orbEnemiesPerScreen[0], options.orbEnemiesPerScreen[1]);
+    const groups = rng.int(options.orbGroupsPerScreen[0], options.orbGroupsPerScreen[1]);
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < groups; i++) {
       const dp = rng.int(2, Math.max(2, Math.min(6, virtual.atk - 1)));
       const def = virtual.atk - dp;
       if (def < 0) continue;
@@ -136,7 +266,9 @@ export function populate(rng: Rng, layout: Layout, options: PopulateOptions): Po
         atk: virtual.def, // de = 0 なので被害ゼロ
         def,
       };
-      if (place(screen, { ...enemy, name: '野犬', orb: 1 })) virtual.orbs += 1;
+      // 同じ敵をかたまりで置く。無害な敵なので、増やしても分岐は増えない。
+      const length = rng.int(options.groupSize[0], options.groupSize[1]);
+      virtual.orbs += placeGroup(screen, { ...enemy, name: '野犬', orb: 1 }, length);
     }
   };
 
@@ -163,7 +295,9 @@ export function populate(rng: Rng, layout: Layout, options: PopulateOptions): Po
     const viaAltar = virtual.orbs >= 2 && rng.chance(0.5);
 
     if (viaAltar) {
-      const cost = Math.min(virtual.orbs, rng.int(2, 3));
+      // 手持ちに対する割合で決める。定額にすると、オーブ源が増えたとたんに
+      // 「どちらも買える」になり、排他の選択が選択でなくなる。
+      const cost = Math.max(2, Math.min(virtual.orbs, Math.round(virtual.orbs * (0.4 + rng.next() * 0.3))));
       const placed = place(source, {
         type: 'altar',
         id: `altar-${passage.gate}`,

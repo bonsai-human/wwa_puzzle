@@ -10,8 +10,9 @@ import { compileMap, parseMapDef } from '../core/index.ts';
 import type { CompiledMap } from '../core/index.ts';
 import tutorial from './tutorial.json';
 import descent from './descent.json';
+import ruins from './ruins.json';
 
-export const BUILTIN_MAP_DATA: readonly unknown[] = [tutorial, descent];
+export const BUILTIN_MAP_DATA: readonly unknown[] = [tutorial, descent, ruins];
 
 export interface MapEntry {
   readonly id: string;

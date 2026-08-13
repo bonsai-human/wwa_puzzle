@@ -165,7 +165,8 @@ describe('生成', () => {
     }
   });
 
-  it('同じ種からは同じマップが出る', () => {
+  // 生成を2回まわす。既定は 3×3 画面・約200物体なので、既定の5秒には収まらない。
+  it('同じ種からは同じマップが出る', { timeout: 30_000 }, () => {
     const first = generate({ seed: 99, attempts: 8 });
     const second = generate({ seed: 99, attempts: 8 });
 
@@ -173,6 +174,105 @@ describe('生成', () => {
     const right = second.ok ? second.candidate.def : second.best?.def;
 
     expect(left).toEqual(right);
+  });
+
+  it('生成した盤面が薄くない', () => {
+    // 歩ける床のうち何割が埋まっているかで見る。同梱マップ側でも同じ規則。
+    for (const { seed, result } of results) {
+      const candidate = result.ok ? result.candidate : result.best;
+      if (candidate === null) continue;
+
+      const def = candidate.def;
+      let floor = 0;
+      for (const row of def.terrain) for (const cell of row) if (cell === '.') floor += 1;
+
+      expect(def.objects.length / floor, `seed ${seed}`).toBeGreaterThanOrEqual(0.15);
+    }
+  });
+
+  it('物体が画面のあちこちに散らばっている', () => {
+    /**
+     * 一様乱数で置き場所を選ぶと、床の2割を埋める程度の物量では必ずどこかに固まり、
+     * 部屋の一角がまるごと空く。「物を増やしたのに薄い部屋がある」という見え方になる。
+     *
+     * 物体を含む画面について、画面を4分割したどの区画にも何かがあることを見る。
+     */
+    for (const { seed, result } of results) {
+      const candidate = result.ok ? result.candidate : result.best;
+      if (candidate === null) continue;
+
+      const def = candidate.def;
+      const quadrants = new Map<string, Set<number>>();
+      const counts = new Map<string, number>();
+
+      for (const object of def.objects) {
+        const screen = `${Math.floor(object.x / def.screen!.width)},${Math.floor(object.y / def.screen!.height)}`;
+        const half = (value: number, size: number): number => (value % size < size / 2 ? 0 : 1);
+        const quadrant =
+          half(object.x, def.screen!.width) + 2 * half(object.y, def.screen!.height);
+
+        if (!quadrants.has(screen)) quadrants.set(screen, new Set());
+        quadrants.get(screen)!.add(quadrant);
+        counts.set(screen, (counts.get(screen) ?? 0) + 1);
+      }
+
+      for (const [screen, seen] of quadrants) {
+        // 物体が少ない画面まで問うても意味がない。
+        if ((counts.get(screen) ?? 0) < 12) continue;
+        expect(seen.size, `seed ${seed} 画面 ${screen}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('同じものがかたまりで置かれている', () => {
+    /**
+     * 1個ずつ散らすと、物量を増やしても「散らかっている」だけになる。
+     * 横に2つ以上並んだ同種の組がいくつあるかで、かたまりになっているかを見る。
+     */
+    for (const { seed, result } of results) {
+      const candidate = result.ok ? result.candidate : result.best;
+      if (candidate === null) continue;
+
+      const at = new Map<string, string>();
+      for (const object of candidate.def.objects) {
+        // 効果や強さまで含めて「同じもの」とみなす。位置だけ除く。
+        const { x, y, ...rest } = object;
+        at.set(`${x},${y}`, JSON.stringify(rest));
+      }
+
+      let runs = 0;
+      for (const [key, signature] of at) {
+        const [x, y] = key.split(',').map(Number) as [number, number];
+        // 並びの先頭だけ数える。
+        if (at.get(`${x - 1},${y}`) === signature) continue;
+        if (at.get(`${x + 1},${y}`) === signature) runs += 1;
+      }
+
+      expect(runs, `seed ${seed}`).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it('防御アイテムは並べて置かない', () => {
+    /**
+     * 防御は敵1体ぶんではなく、盤面の敵すべての攻撃から引かれる。
+     * 並べて置くと敵がまとめて無害になり、締める対象そのものが消える。
+     * 実測では防御が24まで育ち、解の全行程でHPを取る敵が1体しか残らなかった。
+     */
+    for (const { seed, result } of results) {
+      const candidate = result.ok ? result.candidate : result.best;
+      if (candidate === null) continue;
+
+      const shields = new Set(
+        candidate.def.objects
+          .filter((object) => object.type === 'item' && object.effect.kind === 'def')
+          .map((object) => `${object.x},${object.y}`),
+      );
+
+      for (const key of shields) {
+        const [x, y] = key.split(',').map(Number) as [number, number];
+        expect(shields.has(`${x + 1},${y}`), `seed ${seed} (${x}, ${y})`).toBe(false);
+      }
+    }
   });
 
   it('生成物のオブジェクトが壁や開始位置に重ならない', () => {

@@ -27,6 +27,8 @@ export interface GenerateOptions {
   /** 探索の予算。生成ループでは短く切る。 */
   readonly maxStates?: number;
   readonly criteria?: Partial<Criteria>;
+  /** 配置の初期設定。試行ごとに失敗理由に応じて動かす起点になる。 */
+  readonly populate?: PopulateOptions;
 }
 
 export interface Criteria {
@@ -136,18 +138,27 @@ export function generate(options: GenerateOptions): GenerateResult {
   const criteria = { ...DEFAULT_CRITERIA, ...options.criteria };
   const maxStates = options.maxStates ?? 60_000;
 
-  let populateOptions = DEFAULT_POPULATE;
+  let populateOptions = options.populate ?? DEFAULT_POPULATE;
   let best: Candidate | null = null;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     // 試行ごとに種をずらす。同じ種からは必ず同じ結果が出る。
     const rng = createRng(options.seed * 1_000_003 + attempt);
 
+    /*
+     * 既定は 3×3 画面。2×2 だと主経路の関門が最大3つしか作れず、
+     * その半分近くが扉になるので、**HPを削る関門が1〜2個しか残らない**。
+     * それでは締めようがなく、実測の合格率は 1/12 まで落ちた。
+     * 3×3 にすると関門が増え、同じ調整のまま 12/12 になる。
+     *
+     * 描画は常に1画面ぶんなので、画面を増やしてもタイルは小さくならない。
+     * 表示に効くのは画面の大きさ（14×14）だけで、こちらはむしろ以前より大きい。
+     */
     const layout = generateLayout(rng, {
-      screensX: options.screensX ?? 2,
-      screensY: options.screensY ?? 2,
-      screenWidth: options.screenWidth ?? 16,
-      screenHeight: options.screenHeight ?? 16,
+      screensX: options.screensX ?? 3,
+      screensY: options.screensY ?? 3,
+      screenWidth: options.screenWidth ?? 14,
+      screenHeight: options.screenHeight ?? 14,
     });
 
     let population;

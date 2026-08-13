@@ -10,10 +10,11 @@
  * 通らない敵をいくら強くしても、余ったHPは減らない。
  */
 
-import { compileMap } from '../core/index.ts';
+import { battle, compileMap, initialState } from '../core/index.ts';
 import type { CompiledMap, MapDef, PlacedObject } from '../core/index.ts';
 import { evaluate } from '../solver/difficulty.ts';
 import type { DifficultyReport } from '../solver/difficulty.ts';
+import { applyAction } from '../solver/macro.ts';
 import { solve } from '../solver/search.ts';
 import type { SolveOptions } from '../solver/types.ts';
 
@@ -25,17 +26,39 @@ export interface Repaired {
   readonly steps: number;
 }
 
-/** 解が通る敵のうち、手数が多い＝攻撃力を上げたときに効きやすいものを選ぶ。 */
+/**
+ * 解が通る敵のうち、**すでにHPを取っているもの**だけを選ぶ。
+ *
+ * 無害な敵（反撃を受けない敵）に手を出してはいけない。攻撃力を1上げた瞬間に
+ * それは「倒すかどうか」の選択肢に変わる。ソルバーは無害な敵を強制手として
+ * 分岐なしで処理しているので、盤面に何十体も置いてあっても探索は増えないが、
+ * 有害にした途端そのすべてが分岐になり、探索木が組み合わせ的に膨らむ。
+ * 実測では1マップの生成に187秒かかり、分岐点は1000を超えた。
+ *
+ * 締めたいのは関門であって、道端の雑魚ではない。
+ */
 function gatesOnSolution(map: CompiledMap, options: SolveOptions): number[] {
   const result = solve(map, options);
   if (result.status !== 'solved' || result.plan === null) return [];
 
+  // 手順を再生しながら、その時点のステータスで戦闘コストを測る。
+  let state = initialState(map);
   const cells: number[] = [];
+
   for (const action of result.plan) {
-    if (action.kind !== 'resolve') continue;
-    const object = map.objectAt[action.cell] ?? null;
-    if (object?.type === 'enemy') cells.push(action.cell);
+    if (action.kind === 'resolve') {
+      const object = map.objectAt[action.cell] ?? null;
+      if (object?.type === 'enemy') {
+        const outcome = battle(state, object);
+        if (outcome.outcome === 'win' && outcome.cost > 0) cells.push(action.cell);
+      }
+    }
+
+    const next = applyAction(map, state, action);
+    if (next === null) break;
+    state = next;
   }
+
   return cells;
 }
 
